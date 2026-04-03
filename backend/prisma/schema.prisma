@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,5 +5,147 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["transitview"]
+}
 
+enum UserRole {
+  Kasutaja
+  Andmebaasi_toimetaja
+  Administraator
+
+  @@schema("transitview")
+}
+
+enum ReviewStatus {
+  Ootel
+  Kinnitatud
+  Tagasi_lukatud
+
+  @@schema("transitview")
+}
+
+model Counties {
+  county_id Int    @id @default(autoincrement())
+  name      String @unique @db.VarChar(100)
+
+  cities Cities[]
+
+  @@schema("transitview")
+}
+
+model Cities {
+  city_id    Int    @id @default(autoincrement())
+  county_id  Int
+  name       String @db.VarChar(100)
+
+  county            Counties           @relation(fields: [county_id], references: [county_id], onDelete: Restrict, onUpdate: Cascade)
+  companies         Companies[]
+  company_branches  Company_branches[]
+  photos            Photos[]
+
+  @@unique([county_id, name])
+  @@schema("transitview")
+}
+
+model Companies {
+  company_id Int    @id @default(autoincrement())
+  city_id    Int
+  name       String @unique @db.VarChar(150)
+
+  city              Cities             @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
+  company_branches  Company_branches[]
+
+  @@schema("transitview")
+}
+
+model Company_branches {
+  branch_id    Int     @id @default(autoincrement())
+  company_id   Int
+  city_id      Int
+  branch_name  String? @db.VarChar(150)
+
+  company   Companies @relation(fields: [company_id], references: [company_id], onDelete: Restrict, onUpdate: Cascade)
+  city      Cities    @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
+  vehicles  Vehicles[]
+
+  @@schema("transitview")
+}
+
+model Categories {
+  category_id Int    @id @default(autoincrement())
+  name        String @unique @db.VarChar(50)
+
+  models Models[]
+
+  @@schema("transitview")
+}
+
+model Models {
+  model_id      Int    @id @default(autoincrement())
+  category_id   Int
+  name          String @db.VarChar(100)
+  manufacturer  String @db.VarChar(100)
+
+  category  Categories @relation(fields: [category_id], references: [category_id], onDelete: Restrict, onUpdate: Cascade)
+  vehicles  Vehicles[]
+
+  @@unique([manufacturer, name])
+  @@schema("transitview")
+}
+
+model Users {
+  user_id        Int       @id @default(autoincrement())
+  username       String    @unique @db.VarChar(50)
+  password_hash  String    @db.Text
+  role           UserRole
+  created_at     DateTime  @default(now()) @db.Timestamp(6)
+
+  created_vehicles   Vehicles[] @relation("VehicleCreatedBy")
+  reviewed_vehicles  Vehicles[] @relation("VehicleReviewedBy")
+  photos             Photos[]   @relation("PhotoAuthor")
+
+  @@schema("transitview")
+}
+
+model Vehicles {
+  vehicle_id    Int           @id @default(autoincrement())
+  model_id      Int
+  branch_id     Int?
+  reg_number    String        @unique @db.VarChar(20)
+  vla_year      Int?          @db.SmallInt
+  vin_code      String?       @db.VarChar(30)
+  chassis       String?       @db.VarChar(100)
+  status        ReviewStatus
+  created_by    Int
+  reviewed_by   Int?
+  created_at    DateTime      @default(now()) @db.Timestamp(6)
+  reviewed_at   DateTime?     @db.Timestamp(6)
+
+  model         Models             @relation(fields: [model_id], references: [model_id], onDelete: Restrict, onUpdate: Cascade)
+  branch        Company_branches?  @relation(fields: [branch_id], references: [branch_id], onDelete: SetNull, onUpdate: Cascade)
+  creator       Users              @relation("VehicleCreatedBy", fields: [created_by], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
+  reviewer      Users?             @relation("VehicleReviewedBy", fields: [reviewed_by], references: [user_id], onDelete: SetNull, onUpdate: Cascade)
+
+  photos        Photos[]
+
+  @@schema("transitview")
+}
+
+model Photos {
+  photo_id      Int           @id @default(autoincrement())
+  vehicle_id    Int
+  author_id     Int
+  city_id       Int
+  place         String?       @db.VarChar(200)
+  taken_at      DateTime?     @db.Timestamp(6)
+  file_path     String        @db.Text
+  status        ReviewStatus
+  created_at    DateTime      @default(now()) @db.Timestamp(6)
+  reviewed_at   DateTime?     @db.Timestamp(6)
+
+  vehicle       Vehicles      @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade, onUpdate: Cascade)
+  author        Users         @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
+  city          Cities        @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@schema("transitview")
 }

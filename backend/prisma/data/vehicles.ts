@@ -1,0 +1,26 @@
+export const vehicles = [
+  {
+    regNumber: "3014 KUK",
+    manufacturer: "Solaris",
+    modelName: "Urbino IV 18 CNG",
+    branchName: "Tallinna osakond",
+    vlaYear: 2018,
+    vinCode: "YS2R4X20005399401",
+    chassis: "Scania",
+    status: "Kinnitatud",
+    createdByUsername: "user1",
+    reviewedByUsername: "editor1",
+  },
+  {
+    regNumber: "100 SRT",
+    manufacturer: "Volvo",
+    modelName: "9700H NG",
+    branchName: "Tartu osakond",
+    vlaYear: 2012,
+    vinCode: "YV3T2P526C1151984",
+    chassis: "Volvo B11R 4x2",
+    status: "Ootel",
+    createdByUsername: "user1",
+    reviewedByUsername: null,
+  },
+];

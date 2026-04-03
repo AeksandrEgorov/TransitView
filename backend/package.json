@@ -7,14 +7,15 @@
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate dev --name init",
+    "prisma:studio": "npx prisma studio",
+    "db:setup": "prisma migrate reset --force && tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
@@ -24,8 +25,7 @@
     "dotenv": "^17.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "multer": "^2.1.1",
-    "pg": "^8.20.0"
+    "multer": "^2.1.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -36,6 +36,7 @@
     "@types/node": "^25.5.0",
     "prisma": "^7.6.0",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }
 }
