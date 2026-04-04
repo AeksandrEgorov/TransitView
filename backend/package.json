@@ -4,13 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "dev": "tsx watch src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "prisma:generate": "npx prisma generate",
+    "prisma:generate": "npxprisma generate",
     "prisma:migrate": "npx prisma migrate dev --name init",
     "prisma:studio": "npx prisma studio",
-    "db:setup": "prisma migrate reset --force && tsx prisma/seed.ts"
+    "db:setup": "npx prisma migrate reset --force && tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
