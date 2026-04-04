@@ -7,6 +7,7 @@ export interface VehicleListQuery {
   modelId?: string;
   companyId?: string;
   branchId?: string;
+  condition?: string;
 }
 
 export interface UpdateVehicleBody {
@@ -16,4 +17,10 @@ export interface UpdateVehicleBody {
   vla_year?: number | null;
   vin_code?: string | null;
   chassis?: string | null;
+  condition?:
+    | "Töökorras"
+    | "Ei_tööta"
+    | "Maha_kantud"
+    | "Müüdud"
+    | "Teadmata";
 }

@@ -132,9 +132,9 @@ export async function createPhotoHandler(
 
     const body = req.body as CreatePhotoBody;
 
-    if (!body.vehicle_id || !body.city_id || !body.file_path) {
+    if (!body.vehicle_id || !body.file_path) {
       res.status(400).json({
-        message: "vehicle_id, city_id and file_path are required",
+        message: "vehicle_id and file_path are required",
       });
       return;
     }
@@ -152,7 +152,7 @@ export async function createPhotoHandler(
 
     const photo = await createPhoto({
       vehicle_id: Number(body.vehicle_id),
-      city_id: Number(body.city_id),
+      city_id: body.city_id ? Number(body.city_id) : null,
       place: body.place ?? null,
       taken_at: body.taken_at ?? null,
       file_path: body.file_path,
@@ -209,7 +209,16 @@ export async function updatePhotoHandler(
       return;
     }
 
-    const updatedPhoto = await updatePhoto(photoId, body);
+    const updatedPhoto = await updatePhoto(photoId, {
+      city_id:
+        body.city_id !== undefined
+          ? body.city_id === null
+            ? null
+            : Number(body.city_id)
+          : undefined,
+      place: body.place,
+      taken_at: body.taken_at,
+    });
 
     res.status(200).json({
       message: "Photo updated successfully",

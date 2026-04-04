@@ -10,7 +10,7 @@ interface GetPublicPhotosParams {
 
 interface CreatePhotoData {
   vehicle_id: number;
-  city_id: number;
+  city_id?: number | null;
   place?: string | null;
   taken_at?: string | null;
   file_path: string;
@@ -186,7 +186,7 @@ export async function createPhoto(data: CreatePhotoData) {
     data: {
       vehicle_id: data.vehicle_id,
       author_id: data.user_id,
-      city_id: data.city_id,
+      city_id: data.city_id ?? null,
       place: data.place ?? null,
       taken_at: data.taken_at ? new Date(data.taken_at) : null,
       file_path: data.file_path,

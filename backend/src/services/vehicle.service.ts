@@ -10,6 +10,7 @@ interface GetPublicVehiclesParams {
   modelId?: number;
   companyId?: number;
   branchId?: number;
+  condition?: string;
 }
 
 interface CreateVehicleWithFirstPhotoData {
@@ -19,6 +20,12 @@ interface CreateVehicleWithFirstPhotoData {
   vla_year?: number | null;
   vin_code?: string | null;
   chassis?: string | null;
+  condition?:
+    | "Töökorras"
+    | "Ei_tööta"
+    | "Maha_kantud"
+    | "Müüdud"
+    | "Teadmata";
 
   city_id: number;
   place: string;
@@ -38,6 +45,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
     modelId,
     companyId,
     branchId,
+    condition,
   } = params;
 
   const skip = (page - 1) * limit;
@@ -54,6 +62,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
       : {}),
     ...(modelId ? { model_id: modelId } : {}),
     ...(branchId ? { branch_id: branchId } : {}),
+    ...(condition ? { condition: condition as any } : {}),
     ...(cityId
       ? {
           branch: {
@@ -199,6 +208,7 @@ export async function createVehicleWithFirstPhoto(
         vla_year: data.vla_year ?? null,
         vin_code: data.vin_code ?? null,
         chassis: data.chassis ?? null,
+        condition: data.condition ?? "Teadmata",
         status: "Ootel",
         created_by: data.user_id,
       },
@@ -240,6 +250,7 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleBody) 
       ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
       ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
       ...(data.chassis !== undefined ? { chassis: data.chassis } : {}),
+      ...(data.condition !== undefined ? { condition: data.condition } : {}),
     },
   });
 }

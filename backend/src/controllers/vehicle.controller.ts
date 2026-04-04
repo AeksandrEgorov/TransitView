@@ -21,8 +21,8 @@ export async function getVehicles(
   try {
     const query = req.query as VehicleListQuery;
 
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
+    const page = Math.max(Number(query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
     const result = await getPublicVehicles({
       page,
@@ -33,6 +33,7 @@ export async function getVehicles(
       modelId: query.modelId ? Number(query.modelId) : undefined,
       companyId: query.companyId ? Number(query.companyId) : undefined,
       branchId: query.branchId ? Number(query.branchId) : undefined,
+      condition: query.condition,
     });
 
     res.status(200).json(result);
@@ -92,6 +93,7 @@ export async function createVehicleHandler(
       vla_year,
       vin_code,
       chassis,
+      condition,
       city_id,
       place,
       taken_at,
@@ -116,6 +118,7 @@ export async function createVehicleHandler(
       vla_year: vla_year ? Number(vla_year) : null,
       vin_code: vin_code ?? null,
       chassis: chassis ?? null,
+      condition: condition ?? "Teadmata",
       city_id: Number(city_id),
       place,
       taken_at: taken_at ?? null,
@@ -239,8 +242,8 @@ export async function getPendingVehiclesHandler(
   res: Response
 ): Promise<void> {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
 
     const result = await getPendingVehicles({ page, limit });
 

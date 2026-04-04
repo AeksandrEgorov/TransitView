@@ -7,14 +7,14 @@ export interface PhotoListQuery {
 
 export interface CreatePhotoBody {
   vehicle_id: number;
-  city_id: number;
+  city_id?: number | null;
   place?: string | null;
   taken_at?: string | null;
   file_path: string;
 }
 
 export interface UpdatePhotoBody {
-  city_id?: number;
+  city_id?: number | null;
   place?: string | null;
   taken_at?: string | null;
 }
