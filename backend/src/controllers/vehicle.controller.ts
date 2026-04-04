@@ -1,10 +1,6 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
-import type {
-  VehicleListQuery,
-  CreateVehicleBody,
-  UpdateVehicleBody,
-} from "../types/vehicle.js";
+import type { VehicleListQuery, UpdateVehicleBody } from "../types/vehicle.js";
 import {
   getPublicVehicles,
   getVehicleById,
@@ -16,6 +12,7 @@ import {
   approveVehicle,
   rejectVehicle,
 } from "../services/vehicle.service.js";
+import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
 
 export async function getVehicles(
   req: AuthRequest,
@@ -25,7 +22,7 @@ export async function getVehicles(
     const query = req.query as VehicleListQuery;
 
     const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 12;
+    const limit = Number(query.limit) || 10;
 
     const result = await getPublicVehicles({
       page,
@@ -81,33 +78,48 @@ export async function createVehicleHandler(
       return;
     }
 
-    const body = req.body as CreateVehicleBody;
-
-    if (
-      !body.model_id ||
-      !body.reg_number ||
-      !body.city_id ||
-      !body.place ||
-      !body.file_path
-    ) {
+    if (!req.file) {
       res.status(400).json({
-        message:
-          "model_id, reg_number, city_id, place and file_path are required",
+        message: "At least one image is required to create a vehicle card",
       });
       return;
     }
 
+    const {
+      model_id,
+      branch_id,
+      reg_number,
+      vla_year,
+      vin_code,
+      chassis,
+      city_id,
+      place,
+      taken_at,
+    } = req.body;
+
+    if (!model_id || !reg_number || !city_id || !place) {
+      res.status(400).json({
+        message: "model_id, reg_number, city_id and place are required",
+      });
+      return;
+    }
+
+    const uploadedImage = await uploadBufferToCloudinary(
+      req.file.buffer,
+      "transitview"
+    );
+
     const result = await createVehicleWithFirstPhoto({
-      model_id: Number(body.model_id),
-      branch_id: body.branch_id ? Number(body.branch_id) : null,
-      reg_number: body.reg_number,
-      vla_year: body.vla_year ? Number(body.vla_year) : null,
-      vin_code: body.vin_code ?? null,
-      chassis: body.chassis ?? null,
-      city_id: Number(body.city_id),
-      place: body.place,
-      taken_at: body.taken_at ?? null,
-      file_path: body.file_path,
+      model_id: Number(model_id),
+      branch_id: branch_id ? Number(branch_id) : null,
+      reg_number,
+      vla_year: vla_year ? Number(vla_year) : null,
+      vin_code: vin_code ?? null,
+      chassis: chassis ?? null,
+      city_id: Number(city_id),
+      place,
+      taken_at: taken_at ?? null,
+      file_path: uploadedImage.secure_url,
       user_id: req.user.userId,
     });
 
@@ -227,9 +239,8 @@ export async function getPendingVehiclesHandler(
   res: Response
 ): Promise<void> {
   try {
-    const query = req.query as VehicleListQuery;
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 12;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
 
     const result = await getPendingVehicles({ page, limit });
 
@@ -245,19 +256,9 @@ export async function approveVehicleHandler(
   res: Response
 ): Promise<void> {
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
     const vehicleId = Number(req.params.id);
 
-    if (Number.isNaN(vehicleId)) {
-      res.status(400).json({ message: "Invalid vehicle id" });
-      return;
-    }
-
-    const vehicle = await approveVehicle(vehicleId, req.user.userId);
+    const vehicle = await approveVehicle(vehicleId, req.user!.userId);
 
     res.status(200).json({
       message: "Vehicle approved successfully",
@@ -274,19 +275,9 @@ export async function rejectVehicleHandler(
   res: Response
 ): Promise<void> {
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
     const vehicleId = Number(req.params.id);
 
-    if (Number.isNaN(vehicleId)) {
-      res.status(400).json({ message: "Invalid vehicle id" });
-      return;
-    }
-
-    const vehicle = await rejectVehicle(vehicleId, req.user.userId);
+    const vehicle = await rejectVehicle(vehicleId, req.user!.userId);
 
     res.status(200).json({
       message: "Vehicle rejected successfully",

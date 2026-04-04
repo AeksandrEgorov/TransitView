@@ -1,65 +1,77 @@
 import { Router } from "express";
 import {
-  getVehicles,
-  getVehicle,
-  createVehicleHandler,
-  updateVehicleHandler,
-  deleteVehicleHandler,
-  getPendingVehiclesHandler,
-  approveVehicleHandler,
-  rejectVehicleHandler,
-} from "../controllers/vehicle.controller.js";
+  uploadPhotoHandler,
+  getPhotosHandler,
+  getPhotoHandler,
+  getVehiclePhotosHandler,
+  createPhotoHandler,
+  updatePhotoHandler,
+  deletePhotoHandler,
+  getPendingPhotosHandler,
+  approvePhotoHandler,
+  rejectPhotoHandler,
+} from "../controllers/photo.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
 import upload from "../config/multer.js";
 
 const router = Router();
 
-router.get("/", getVehicles);
+router.get("/", getPhotosHandler);
 
 router.get(
   "/pending",
   requireAuth,
   requireRole("Andmebaasi_toimetaja", "Administraator"),
-  getPendingVehiclesHandler
+  getPendingPhotosHandler
 );
 
-router.get("/:id", getVehicle);
+router.get("/vehicle/:vehicleId", getVehiclePhotosHandler);
+
+router.get("/:id", getPhotoHandler);
+
+
+router.post(
+  "/upload",
+  requireAuth,
+  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
+  upload.single("image"),
+  uploadPhotoHandler
+);
 
 router.post(
   "/",
   requireAuth,
   requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  upload.single("image"),
-  createVehicleHandler
+  createPhotoHandler
 );
 
 router.patch(
   "/:id",
   requireAuth,
   requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  updateVehicleHandler
+  updatePhotoHandler
 );
 
 router.delete(
   "/:id",
   requireAuth,
   requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  deleteVehicleHandler
+  deletePhotoHandler
 );
 
 router.patch(
   "/:id/approve",
   requireAuth,
   requireRole("Andmebaasi_toimetaja", "Administraator"),
-  approveVehicleHandler
+  approvePhotoHandler
 );
 
 router.patch(
   "/:id/reject",
   requireAuth,
   requireRole("Andmebaasi_toimetaja", "Administraator"),
-  rejectVehicleHandler
+  rejectPhotoHandler
 );
 
 export default router;

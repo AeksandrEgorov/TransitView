@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.routes.js";
 import vehicleRoutes from "./routes/vehicle.routes.js";
+import photoRoutes from "./routes/photo.routes.js";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.get("/", (_req: Request, res: Response) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/photos", photoRoutes);
 
 const PORT = process.env.PORT || 5000;
 
