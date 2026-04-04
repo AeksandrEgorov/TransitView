@@ -295,7 +295,7 @@ export async function getPendingVehicles(params: {
         },
         photos: {
           orderBy: {
-            created_at: "desc",
+            created_at: "asc",
           },
           take: 1,
         },
@@ -316,27 +316,77 @@ export async function getPendingVehicles(params: {
 }
 
 export async function approveVehicle(vehicleId: number, reviewerId: number) {
-  return prisma.vehicles.update({
-    where: {
-      vehicle_id: vehicleId,
-    },
-    data: {
-      status: "Kinnitatud",
-      reviewed_by: reviewerId,
-      reviewed_at: new Date(),
-    },
+  return prisma.$transaction(async (tx) => {
+    const vehicle = await tx.vehicles.update({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      data: {
+        status: "Kinnitatud",
+        reviewed_by: reviewerId,
+        reviewed_at: new Date(),
+      },
+    });
+
+    const firstPhoto = await tx.photos.findFirst({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      orderBy: {
+        created_at: "asc",
+      },
+    });
+
+    if (firstPhoto) {
+      await tx.photos.update({
+        where: {
+          photo_id: firstPhoto.photo_id,
+        },
+        data: {
+          status: "Kinnitatud",
+          reviewed_at: new Date(),
+        },
+      });
+    }
+
+    return vehicle;
   });
 }
 
 export async function rejectVehicle(vehicleId: number, reviewerId: number) {
-  return prisma.vehicles.update({
-    where: {
-      vehicle_id: vehicleId,
-    },
-    data: {
-      status: "Tagasi_lukatud",
-      reviewed_by: reviewerId,
-      reviewed_at: new Date(),
-    },
+  return prisma.$transaction(async (tx) => {
+    const vehicle = await tx.vehicles.update({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      data: {
+        status: "Tagasi_lukatud",
+        reviewed_by: reviewerId,
+        reviewed_at: new Date(),
+      },
+    });
+
+    const firstPhoto = await tx.photos.findFirst({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      orderBy: {
+        created_at: "asc",
+      },
+    });
+
+    if (firstPhoto) {
+      await tx.photos.update({
+        where: {
+          photo_id: firstPhoto.photo_id,
+        },
+        data: {
+          status: "Tagasi_lukatud",
+          reviewed_at: new Date(),
+        },
+      });
+    }
+
+    return vehicle;
   });
 }
