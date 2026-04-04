@@ -159,17 +159,19 @@ async function main() {
       where: { username: photo.authorUsername },
     });
 
-    const city = await prisma.cities.findFirstOrThrow({
-      where: { name: photo.cityName },
-    });
+    const city = photo.cityName
+      ? await prisma.cities.findFirstOrThrow({
+          where: { name: photo.cityName },
+        })
+      : null;
 
     await prisma.photos.create({
       data: {
         vehicle_id: vehicle.vehicle_id,
         author_id: author.user_id,
-        city_id: city.city_id,
-        place: photo.place,
-        taken_at: photo.takenAt,
+        city_id: city?.city_id ?? null,
+        place: photo.place ?? null,
+        taken_at: photo.takenAt ?? null,
         file_path: photo.filePath,
         status: photo.status as ReviewStatus,
         reviewed_at: photo.status === "Kinnitatud" ? new Date() : null,

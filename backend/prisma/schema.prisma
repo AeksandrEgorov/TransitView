@@ -135,7 +135,7 @@ model Photos {
   photo_id      Int           @id @default(autoincrement())
   vehicle_id    Int
   author_id     Int
-  city_id       Int
+  city_id       Int?
   place         String?       @db.VarChar(200)
   taken_at      DateTime?     @db.Timestamp(6)
   file_path     String        @db.Text
@@ -145,7 +145,7 @@ model Photos {
 
   vehicle       Vehicles      @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade, onUpdate: Cascade)
   author        Users         @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
-  city          Cities        @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
+  city          Cities?        @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
 
   @@schema("transitview")
 }
