@@ -28,28 +28,32 @@ Piirangud:
 ## Käivitamine
 
 1. install:
+```
 npm install
-
+```
 2. prisma:
+```
 npm run prisma:migrate
 npx prisma generate  
 npm run seed
+```
 
 3. run:
+```
 npm run dev
-
+```
 Backend:
 http://localhost:5000
 
 ## .env
-
+```
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME?schema=SCHEMA_NAME"
 PORT=5000
 JWT_SECRET="key"
 CLOUDINARY_CLOUD_NAME=""
 CLOUDINARY_API_KEY=""
 CLOUDINARY_API_SECRET=""
-
+``` 
 ## Auth
 
 Login → tagastab JWT tokeni  
@@ -58,7 +62,7 @@ Protected route → Authorization: Bearer TOKEN
 ## Peamised endpoints
 
 ### Auth
-
+```
 POST /api/auth/login  
 → Login (create session / get JWT token)  
 Auth: no  
@@ -66,10 +70,10 @@ Auth: no
 GET /api/auth/me  
 → Get current user  
 Auth: yes  
-
+```
 
 ### Vehicles
-
+```
 GET /api/vehicles  
 → Get all approved vehicles (list, pagination, filters)  
 Auth: no  
@@ -101,10 +105,10 @@ Auth: yes (moderator/admin)
 PATCH /api/vehicles/:id/reject  
 → Reject vehicle (+ first photo)  
 Auth: yes (moderator/admin)  
-
+```
 
 ### Photos
-
+```
 POST /api/photos/upload  
 → Upload image to Cloudinary  
 Auth: yes  
@@ -144,10 +148,10 @@ Auth: yes (moderator/admin)
 PATCH /api/photos/:id/reject  
 → Reject photo  
 Auth: yes (moderator/admin)  
-
+```
 
 ### Reference (no auth)
-
+```
 GET /api/reference/counties  
 → Get all counties  
 
@@ -165,10 +169,10 @@ GET /api/reference/companies
 
 GET /api/reference/company-branches  
 → Get company branches (filter by companyId / cityId)  
-
+```
 
 ### Users (admin only)
-
+```
 GET /api/users  
 → Get all users  
 Auth: admin  
@@ -188,7 +192,7 @@ Auth: admin
 DELETE /api/users/:id  
 → Delete user  
 Auth: admin  
-
+```
 ## Modereerimine
 
 Transport luuakse staatuses Ootel.  
