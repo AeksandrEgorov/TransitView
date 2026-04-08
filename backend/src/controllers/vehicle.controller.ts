@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
-import type { VehicleListQuery, UpdateVehicleBody } from "../types/vehicle.js";
+import type { VehicleListQuery } from "../types/vehicle.js";
 import {
   getPublicVehicles,
   getVehicleById,
@@ -13,6 +13,10 @@ import {
   rejectVehicle,
 } from "../services/vehicle.service.js";
 import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
+import {
+  createVehicleSchema,
+  updateVehicleSchema,
+} from "../validators/vehicle.validator.js";
 
 export async function getVehicles(
   req: AuthRequest,
@@ -86,6 +90,16 @@ export async function createVehicleHandler(
       return;
     }
 
+    const parsed = createVehicleSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
     const {
       model_id,
       branch_id,
@@ -97,14 +111,7 @@ export async function createVehicleHandler(
       city_id,
       place,
       taken_at,
-    } = req.body;
-
-    if (!model_id || !reg_number || !city_id || !place) {
-      res.status(400).json({
-        message: "model_id, reg_number, city_id and place are required",
-      });
-      return;
-    }
+    } = parsed.data;
 
     const uploadedImage = await uploadBufferToCloudinary(
       req.file.buffer,
@@ -112,16 +119,16 @@ export async function createVehicleHandler(
     );
 
     const result = await createVehicleWithFirstPhoto({
-      model_id: Number(model_id),
-      branch_id: branch_id ? Number(branch_id) : null,
+      model_id,
+      branch_id,
       reg_number,
-      vla_year: vla_year ? Number(vla_year) : null,
-      vin_code: vin_code ?? null,
-      chassis: chassis ?? null,
-      condition: condition ?? "Teadmata",
-      city_id: Number(city_id),
+      vla_year,
+      vin_code,
+      chassis,
+      condition,
+      city_id,
       place,
-      taken_at: taken_at ?? null,
+      taken_at,
       file_path: uploadedImage.secure_url,
       user_id: req.user.userId,
     });
@@ -153,7 +160,15 @@ export async function updateVehicleHandler(
       return;
     }
 
-    const body = req.body as UpdateVehicleBody;
+    const parsed = updateVehicleSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
 
     const vehicle = await getVehicleForEdit(vehicleId);
 
@@ -176,7 +191,7 @@ export async function updateVehicleHandler(
       return;
     }
 
-    const updatedVehicle = await updateVehicle(vehicleId, body);
+    const updatedVehicle = await updateVehicle(vehicleId, parsed.data);
 
     res.status(200).json({
       message: "Vehicle updated successfully",
@@ -261,6 +276,11 @@ export async function approveVehicleHandler(
   try {
     const vehicleId = Number(req.params.id);
 
+    if (Number.isNaN(vehicleId)) {
+      res.status(400).json({ message: "Invalid vehicle id" });
+      return;
+    }
+
     const vehicle = await approveVehicle(vehicleId, req.user!.userId);
 
     res.status(200).json({
@@ -279,6 +299,11 @@ export async function rejectVehicleHandler(
 ): Promise<void> {
   try {
     const vehicleId = Number(req.params.id);
+
+    if (Number.isNaN(vehicleId)) {
+      res.status(400).json({ message: "Invalid vehicle id" });
+      return;
+    }
 
     const vehicle = await rejectVehicle(vehicleId, req.user!.userId);
 

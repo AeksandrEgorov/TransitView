@@ -3,17 +3,21 @@ import bcrypt from "bcrypt";
 import prisma from "../config/prisma.js";
 import { signToken } from "../utils/jwt.js";
 import type { AuthRequest } from "../types/auth.js";
+import { loginSchema } from "../validators/auth.validator.js";
 
 export async function login(req: Request, res: Response): Promise<void> {
   try {
-    const { username, password } = req.body;
+    const parsed = loginSchema.safeParse(req.body);
 
-    if (!username || !password) {
+    if (!parsed.success) {
       res.status(400).json({
-        message: "Username and password are required",
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
       });
       return;
     }
+
+    const { username, password } = parsed.data;
 
     const user = await prisma.users.findUnique({
       where: { username },

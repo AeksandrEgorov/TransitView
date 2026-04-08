@@ -1,7 +1,6 @@
 import type { Response } from "express";
 import bcrypt from "bcrypt";
 import type { AuthRequest } from "../types/auth.js";
-import type { CreateUserBody, UpdateUserBody } from "../types/user.js";
 import {
   getAllUsers,
   getUserById,
@@ -10,6 +9,10 @@ import {
   updateUser,
   deleteUser,
 } from "../services/user.service.js";
+import {
+  createUserSchema,
+  updateUserSchema,
+} from "../validators/user.validator.js";
 
 export async function getUsersHandler(
   _req: AuthRequest,
@@ -56,14 +59,17 @@ export async function createUserHandler(
   res: Response
 ): Promise<void> {
   try {
-    const body = req.body as CreateUserBody;
+    const parsed = createUserSchema.safeParse(req.body);
 
-    if (!body.username || !body.password || !body.role) {
+    if (!parsed.success) {
       res.status(400).json({
-        message: "username, password and role are required",
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
       });
       return;
     }
+
+    const body = parsed.data;
 
     if (body.role === "Administraator") {
       res.status(403).json({
@@ -111,7 +117,17 @@ export async function updateUserHandler(
       return;
     }
 
-    const body = req.body as UpdateUserBody;
+    const parsed = updateUserSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const body = parsed.data;
 
     const existingUser = await getUserById(userId);
 

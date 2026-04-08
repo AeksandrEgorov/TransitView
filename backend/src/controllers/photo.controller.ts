@@ -2,7 +2,6 @@ import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
 import type {
   PhotoListQuery,
-  CreatePhotoBody,
   UpdatePhotoBody,
 } from "../types/photo.js";
 import {
@@ -19,6 +18,10 @@ import {
 } from "../services/photo.service.js";
 import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
 import prisma from "../config/prisma.js";
+import {
+  createPhotoSchema,
+  updatePhotoSchema,
+} from "../validators/photo.validator.js";
 
 export async function uploadPhotoHandler(
   req: AuthRequest,
@@ -130,18 +133,21 @@ export async function createPhotoHandler(
       return;
     }
 
-    const body = req.body as CreatePhotoBody;
+    const parsed = createPhotoSchema.safeParse(req.body);
 
-    if (!body.vehicle_id || !body.file_path) {
+    if (!parsed.success) {
       res.status(400).json({
-        message: "vehicle_id and file_path are required",
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
       });
       return;
     }
 
+    const body = parsed.data;
+
     const vehicle = await prisma.vehicles.findUnique({
       where: {
-        vehicle_id: Number(body.vehicle_id),
+        vehicle_id: body.vehicle_id,
       },
     });
 
@@ -151,10 +157,10 @@ export async function createPhotoHandler(
     }
 
     const photo = await createPhoto({
-      vehicle_id: Number(body.vehicle_id),
-      city_id: body.city_id ? Number(body.city_id) : null,
-      place: body.place ?? null,
-      taken_at: body.taken_at ?? null,
+      vehicle_id: body.vehicle_id,
+      city_id: body.city_id,
+      place: body.place,
+      taken_at: body.taken_at,
       file_path: body.file_path,
       user_id: req.user.userId,
     });
@@ -186,7 +192,17 @@ export async function updatePhotoHandler(
       return;
     }
 
-    const body = req.body as UpdatePhotoBody;
+    const parsed = updatePhotoSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const body = parsed.data as UpdatePhotoBody;
 
     const photo = await getPhotoForEdit(photoId);
 
@@ -209,16 +225,7 @@ export async function updatePhotoHandler(
       return;
     }
 
-    const updatedPhoto = await updatePhoto(photoId, {
-      city_id:
-        body.city_id !== undefined
-          ? body.city_id === null
-            ? null
-            : Number(body.city_id)
-          : undefined,
-      place: body.place,
-      taken_at: body.taken_at,
-    });
+    const updatedPhoto = await updatePhoto(photoId, body);
 
     res.status(200).json({
       message: "Photo updated successfully",
