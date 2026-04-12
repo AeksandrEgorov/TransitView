@@ -22,6 +22,7 @@ import {
   createPhotoSchema,
   updatePhotoSchema,
 } from "../validators/photo.validator.js";
+import { rejectSchema } from "../validators/moderation.validator.js";
 
 export async function uploadPhotoHandler(
   req: AuthRequest,
@@ -153,6 +154,18 @@ export async function createPhotoHandler(
 
     if (!vehicle) {
       res.status(404).json({ message: "Vehicle not found" });
+      return;
+    }
+
+    const isOwner = vehicle.created_by === req.user.userId;
+    const isHigherRole =
+      req.user.role === "Andmebaasi_toimetaja" ||
+      req.user.role === "Administraator";
+
+    if (!isOwner && !isHigherRole) {
+      res.status(403).json({
+        message: "You cannot add a photo to this vehicle",
+      });
       return;
     }
 
@@ -340,7 +353,17 @@ export async function rejectPhotoHandler(
       return;
     }
 
-    const photo = await rejectPhoto(photoId);
+    const parsed = rejectSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const photo = await rejectPhoto(photoId, parsed.data.review_comment);
 
     res.status(200).json({
       message: "Photo rejected successfully",

@@ -8,6 +8,7 @@ export const vehicles = [
     condition: "Töökorras",
     createdByUsername: "user1",
     reviewedByUsername: "editor1",
+    reviewComment: "",
   },
   {
     regNumber: "ES-ECJ",

@@ -114,6 +114,7 @@ async function main() {
     });
   }
 
+  
   // USERS
   for (const user of users) {
     const passwordHash = await bcrypt.hash(user.password, 10);
@@ -165,6 +166,7 @@ async function main() {
         created_by: creator.user_id,
         reviewed_by: reviewer?.user_id ?? null,
         reviewed_at: reviewer ? new Date() : null,
+        review_comment: vehicle.reviewComment ?? null,
       },
     });
   }
@@ -195,6 +197,7 @@ async function main() {
         file_path: photo.filePath,
         status: photo.status as ReviewStatus,
         reviewed_at: photo.status === "Kinnitatud" ? new Date() : null,
+        review_comment: photo.reviewComment ?? null,
       },
     });
   }

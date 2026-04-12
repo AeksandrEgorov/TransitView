@@ -133,6 +133,7 @@ model Vehicles {
   reviewed_by   Int?
   created_at    DateTime          @default(now()) @db.Timestamptz(6)
   reviewed_at   DateTime?         @db.Timestamptz(6)
+  review_comment  String?         @db.Text
 
   model         Models             @relation(fields: [model_id], references: [model_id], onDelete: Restrict, onUpdate: Cascade)
   branch        Company_branches?  @relation(fields: [branch_id], references: [branch_id], onDelete: SetNull, onUpdate: Cascade)
@@ -155,6 +156,7 @@ model Photos {
   status        ReviewStatus
   created_at    DateTime      @default(now()) @db.Timestamptz(6)
   reviewed_at   DateTime?     @db.Timestamptz(6)
+  review_comment  String?     @db.Text
 
   vehicle       Vehicles      @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade, onUpdate: Cascade)
   author        Users         @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)

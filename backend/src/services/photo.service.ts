@@ -191,6 +191,7 @@ export async function createPhoto(data: CreatePhotoData) {
       taken_at: data.taken_at ? new Date(data.taken_at) : null,
       file_path: data.file_path,
       status: "Ootel",
+      review_comment: null,
     },
   });
 }
@@ -292,11 +293,12 @@ export async function approvePhoto(photoId: number) {
     data: {
       status: "Kinnitatud",
       reviewed_at: new Date(),
+      review_comment: null,
     },
   });
 }
 
-export async function rejectPhoto(photoId: number) {
+export async function rejectPhoto(photoId: number, reviewComment: string) {
   return prisma.photos.update({
     where: {
       photo_id: photoId,
@@ -304,6 +306,7 @@ export async function rejectPhoto(photoId: number) {
     data: {
       status: "Tagasi_lukatud",
       reviewed_at: new Date(),
+      review_comment: reviewComment,
     },
   });
 }

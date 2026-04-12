@@ -17,6 +17,7 @@ import {
   createVehicleSchema,
   updateVehicleSchema,
 } from "../validators/vehicle.validator.js";
+import { rejectSchema } from "../validators/moderation.validator.js";
 
 export async function getVehicles(
   req: AuthRequest,
@@ -305,7 +306,21 @@ export async function rejectVehicleHandler(
       return;
     }
 
-    const vehicle = await rejectVehicle(vehicleId, req.user!.userId);
+    const parsed = rejectSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const vehicle = await rejectVehicle(
+      vehicleId,
+      req.user!.userId,
+      parsed.data.review_comment
+    );
 
     res.status(200).json({
       message: "Vehicle rejected successfully",

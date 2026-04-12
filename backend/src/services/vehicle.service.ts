@@ -211,6 +211,7 @@ export async function createVehicleWithFirstPhoto(
         condition: data.condition ?? "Teadmata",
         status: "Ootel",
         created_by: data.user_id,
+        review_comment: null,
       },
     });
 
@@ -223,6 +224,7 @@ export async function createVehicleWithFirstPhoto(
         taken_at: data.taken_at ? new Date(data.taken_at) : null,
         file_path: data.file_path,
         status: "Ootel",
+        review_comment: null,
       },
     });
 
@@ -336,6 +338,7 @@ export async function approveVehicle(vehicleId: number, reviewerId: number) {
         status: "Kinnitatud",
         reviewed_by: reviewerId,
         reviewed_at: new Date(),
+        review_comment: null,
       },
     });
 
@@ -356,6 +359,7 @@ export async function approveVehicle(vehicleId: number, reviewerId: number) {
         data: {
           status: "Kinnitatud",
           reviewed_at: new Date(),
+          review_comment: null,
         },
       });
     }
@@ -364,7 +368,11 @@ export async function approveVehicle(vehicleId: number, reviewerId: number) {
   });
 }
 
-export async function rejectVehicle(vehicleId: number, reviewerId: number) {
+export async function rejectVehicle(
+  vehicleId: number,
+  reviewerId: number,
+  reviewComment: string
+) {
   return prisma.$transaction(async (tx) => {
     const vehicle = await tx.vehicles.update({
       where: {
@@ -374,6 +382,7 @@ export async function rejectVehicle(vehicleId: number, reviewerId: number) {
         status: "Tagasi_lukatud",
         reviewed_by: reviewerId,
         reviewed_at: new Date(),
+        review_comment: reviewComment,
       },
     });
 
@@ -394,6 +403,7 @@ export async function rejectVehicle(vehicleId: number, reviewerId: number) {
         data: {
           status: "Tagasi_lukatud",
           reviewed_at: new Date(),
+          review_comment: reviewComment,
         },
       });
     }

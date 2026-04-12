@@ -87,6 +87,7 @@ CREATE TABLE "Vehicles" (
     "reviewed_by" INTEGER,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "reviewed_at" TIMESTAMPTZ(6),
+    "review_comment" TEXT,
 
     CONSTRAINT "Vehicles_pkey" PRIMARY KEY ("vehicle_id")
 );
@@ -103,6 +104,7 @@ CREATE TABLE "Photos" (
     "status" "ReviewStatus" NOT NULL,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "reviewed_at" TIMESTAMPTZ(6),
+    "review_comment" TEXT,
 
     CONSTRAINT "Photos_pkey" PRIMARY KEY ("photo_id")
 );
