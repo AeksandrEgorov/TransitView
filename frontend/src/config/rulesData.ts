@@ -90,19 +90,5 @@ export const GALLERY_RULES: Rule[] = [
     NB! Kui tekkivad küsimused või probleemid, siis te võite pöörata kas administraatorile või moderaatorile (vt. "Administratsioon")
     `,
     variant: "info"
-  },
-  {
-    id: 7,
-    title: "Administratsioon",
-    description: `
-    Ilja Sizonenko
-    Administraator
-    email: ilsizo@taltech.ee
-
-    Aleksandr Egorov
-    Moderaator
-    email: aegoro@taltech.ee
-    `,
-    variant: "attention"
   }
 ];
