@@ -4,6 +4,7 @@ import HomePage from "../pages/HomePage";
 import GalleryPage from "../pages/GalleryPage";
 import DashboardPage from "../pages/DashboardPage";
 import GalleryRules from "../pages/GalleryRules";
+import Administration from "../pages/Contacts";
 import ProtectedRoute from "./ProtectedRoute";
 
 function AppRoutes() {
@@ -13,6 +14,7 @@ function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/rules" element={<GalleryRules />} />
+        <Route path="/contacts" element={<Administration />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />

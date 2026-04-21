@@ -16,7 +16,7 @@ export const TEAM_DATA: TeamMember[] = [
     email: "ilsizo@taltech.ee",
     description: "Vastutab veebisaidi tehnilise korrashoiu, andmebaasi struktuuri ja üldiste reeglite täitmise eest.",
     variant: 'admin',
-    image: "/src/data/garden.jpg"
+    image: "https://res.cloudinary.com/dwdgqbs1r/image/upload/v1776763264/IMG_20260421_121256_ko9pfo.jpg"
   },
   {
     id: 2,
@@ -25,6 +25,6 @@ export const TEAM_DATA: TeamMember[] = [
     email: "aegoro@taltech.ee",
     description: "Kontrollib andmete õigsust (numbrimärgid, mudelid) ning teeb vajadusel parandusi andmebaasis.",
     variant: 'moderator',
-    image: "/src/data/garden.jpg"
+    image: "https://res.cloudinary.com/dwdgqbs1r/image/upload/v1776763289/IMG_20260421_121345_thkpy9.jpg"
   }
 ];

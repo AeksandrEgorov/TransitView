@@ -30,7 +30,7 @@ export const GALLERY_RULES: Rule[] = [
     Autoriõiguste rikkumise korral, kui laaditakse üles teiste fotod ilma autori loata, juhtub järgmine:
     1. Esimese rikkumise korral antakse hoiatus ja autoriõigusi rikkuv foto eemaldatakse.
     2. Korduva rikkumise korral eemaldatakse kasutaja saidilt.
-    3. Kui olete langenud autoriõiguste rikkumise ohvriks, võtke ühendust veebisaidi haldajaga (vt. "Administratsioon").`,
+    3. Kui olete langenud autoriõiguste rikkumise ohvriks, võtke ühendust veebisaidi haldajaga (vt. "Kontaktid").`,
     variant: "danger"
   },
   {
@@ -87,7 +87,7 @@ export const GALLERY_RULES: Rule[] = [
     2. Andmebaasi toimetaja (Moderaator)
     2.1. Kontrollib andmete õigsust (numbrimärgid, mudelid, ettevõtted) ja teeb vajadusel parandusi.
     Administratsioon kohustub vaatama läbi kõik taotlused ja fotod 3 päeva jooksul.
-    NB! Kui tekkivad küsimused või probleemid, siis te võite pöörata kas administraatorile või moderaatorile (vt. "Administratsioon")
+    NB! Kui tekkivad küsimused või probleemid, siis te võite pöörata kas administraatorile või moderaatorile (vt. "Kontaktid")
     `,
     variant: "info"
   }

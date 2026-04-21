@@ -76,6 +76,19 @@ function Header() {
                   Reeglid
                 </NavLink>
 
+                <NavLink
+                  to="/contacts"
+                  className={({ isActive }) =>
+                    `${navBaseClass} ${
+                      isActive
+                        ? "bg-slate-900 text-white shadow-inner"
+                        : "text-slate-200 hover:bg-white/8 hover:text-white"
+                    }`
+                  }
+                >
+                  Kontaktid
+                </NavLink>
+
                 {isAuthenticated && (
                   <NavLink
                     to="/dashboard"
@@ -181,6 +194,20 @@ function Header() {
                   }
                 >
                   Reeglid
+                </NavLink>
+
+                <NavLink
+                  to="/contacts"
+                  onClick={closeMenu}
+                  className={({ isActive }) =>
+                    `${navBaseClass} ${
+                      isActive
+                        ? "bg-slate-900 text-white"
+                        : "bg-white/5 text-slate-200 hover:bg-white/10"
+                    }`
+                  }
+                >
+                  Kontaktid
                 </NavLink>
 
                 {isAuthenticated && (
