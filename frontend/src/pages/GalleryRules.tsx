@@ -1,4 +1,4 @@
-import { GALLERY_RULES } from "../config/rulesData";
+import { GALLERY_RULES } from "../data/rulesData";
 import { type Rule } from "../types/rule";
 import { AlertTriangle, Ban, Info, FileText } from "lucide-react";
 
