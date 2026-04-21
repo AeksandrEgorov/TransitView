@@ -2,6 +2,33 @@ import { GALLERY_RULES } from "../config/rulesData";
 import { type Rule } from "../types/rule";
 import { AlertTriangle, Ban, Info, FileText } from "lucide-react";
 
+const formatDescription = (text: string) => {
+  const parts = text.split(/(NB!|(?:\d+\.)+(?:\d+\.)?|\(vt\..*?\))/g);
+  return parts.map((part, i) => {
+    if (part === "NB!") {
+      return (
+        <strong key={i} className="inline-block px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-bold text-[11px] leading-none border border-rose-200 mr-1 shadow-sm">
+          NB!
+        </strong>
+      );
+    }
+    if (/^(\d+\.)+$/.test(part)) {
+      return (
+        <span key={i} className="font-bold text-slate-900 underline decoration-blue-500/30 underline-offset-2 mr-1">
+          {part}
+        </span>
+      );
+    }
+    if (part.startsWith('(vt.')) {
+      return (
+        <span key={i} className="italic text-blue-600/80 font-medium decoration-blue-200 underline-offset-4 hover:text-blue-700 transition-colors cursor-default">
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+};
 function GalleryRules() {
     const variantStyles = {
         danger: "border-rose-200 bg-rose-50/50 text-rose-900 shadow-sm",
@@ -22,10 +49,10 @@ function GalleryRules() {
             Reeglid
             </p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-            Fotode lisamise reeglid
+            TransitView saidi reeglid
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-            TransitView galerii kvaliteedi tagamiseks peavad kõik üleslaaditud fotod vastama järgmistele nõuetele
+            TransitView keskkonna kvaliteedi, korra ja turvalisuse tagamiseks peavad kõik kasutajad ning lisatud sisu vastama järgmistele üldistele eeskirjadele ja nõuetele
             </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2">
@@ -46,7 +73,7 @@ function GalleryRules() {
                         {rule.title}
                     </h3>
                     <p className="text-sm leading-relaxed whitespace-pre-line text-slate-700/90">
-                        {rule.description}
+                        {formatDescription(rule.description)}
                     </p>
                     </div>
                 </div>
