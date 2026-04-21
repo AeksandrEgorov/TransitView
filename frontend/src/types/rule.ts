@@ -2,5 +2,5 @@ export interface Rule {
   id: number;
   title: string;
   description: string;
-  isAllowed: boolean;
+  variant?: 'danger' | 'info' | 'attention'
 }

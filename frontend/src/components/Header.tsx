@@ -63,6 +63,19 @@ function Header() {
                   Galerii
                 </NavLink>
 
+                <NavLink
+                  to="/rules"
+                  className={({ isActive }) =>
+                    `${navBaseClass} ${
+                      isActive
+                        ? "bg-slate-900 text-white shadow-inner"
+                        : "text-slate-200 hover:bg-white/8 hover:text-white"
+                    }`
+                  }
+                >
+                  Reeglid
+                </NavLink>
+
                 {isAuthenticated && (
                   <NavLink
                     to="/dashboard"
@@ -154,6 +167,20 @@ function Header() {
                   }
                 >
                   Galerii
+                </NavLink>
+                
+                <NavLink
+                  to="/rules"
+                  onClick={closeMenu}
+                  className={({ isActive }) =>
+                    `${navBaseClass} ${
+                      isActive
+                        ? "bg-slate-900 text-white"
+                        : "bg-white/5 text-slate-200 hover:bg-white/10"
+                    }`
+                  }
+                >
+                  Reeglid
                 </NavLink>
 
                 {isAuthenticated && (
