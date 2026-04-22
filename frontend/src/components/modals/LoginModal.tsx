@@ -2,6 +2,7 @@ import { useState } from "react";
 import Modal from "../ui/Modal";
 import { login } from "../../config/authApi";
 import { useAuth } from "../../hooks/useAuth";
+import { useToast } from "../../hooks/useToast";
 
 interface Props {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface Props {
 
 function LoginModal({ isOpen, onClose }: Props) {
   const { loginUser } = useAuth();
+  const { showToast } = useToast();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,12 +29,24 @@ function LoginModal({ isOpen, onClose }: Props) {
 
       loginUser(data.token, data.user);
 
+      showToast({
+        variant: "success",
+        title: "Sisselogimine õnnestus",
+        message: `Tere tulemast tagasi, ${data.user.username}!`,
+      });
+
       setUsername("");
       setPassword("");
       onClose();
     } catch (error) {
       console.error(error);
       setErrorMessage("Vale kasutajanimi või parool");
+
+      showToast({
+        variant: "error",
+        title: "Sisselogimine ebaõnnestus",
+        message: "Kontrolli kasutajanime ja parooli.",
+      });
     } finally {
       setIsSubmitting(false);
     }

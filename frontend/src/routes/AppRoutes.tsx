@@ -3,9 +3,10 @@ import MainLayout from "../layouts/MainLayout";
 import HomePage from "../pages/HomePage";
 import GalleryPage from "../pages/GalleryPage";
 import DashboardPage from "../pages/DashboardPage";
+import ProtectedRoute from "./ProtectedRoute";
 import GalleryRules from "../pages/GalleryRules";
 import Administration from "../pages/Contacts";
-import ProtectedRoute from "./ProtectedRoute";
+import NotFoundPage from "../pages/NotFoundPage";
 
 function AppRoutes() {
   return (
@@ -19,6 +20,8 @@ function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
         </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

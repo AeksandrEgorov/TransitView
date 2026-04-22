@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import LoginModal from "./modals/LoginModal";
+import LogoutModal from "./modals/LogoutModal";
 
 function Header() {
   const { user, isAuthenticated, logoutUser } = useAuth();
+  const { showToast } = useToast();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   const navBaseClass =
     "rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200";
@@ -20,6 +25,26 @@ function Header() {
 
   function closeLoginModal() {
     setIsLoginOpen(false);
+  }
+
+  function openLogoutModal() {
+    setIsLogoutOpen(true);
+    closeMenu();
+  }
+
+  function closeLogoutModal() {
+    setIsLogoutOpen(false);
+  }
+
+  function handleLogoutConfirm() {
+    logoutUser();
+    setIsLogoutOpen(false);
+
+    showToast({
+      variant: "info",
+      title: "Välja logitud",
+      message: "Oled edukalt kontolt välja logitud.",
+    });
   }
 
   return (
@@ -124,7 +149,7 @@ function Header() {
                     </div>
 
                     <button
-                      onClick={logoutUser}
+                      onClick={openLogoutModal}
                       className="rounded-xl bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 hover:text-white"
                     >
                       Logi välja
@@ -181,7 +206,7 @@ function Header() {
                 >
                   Galerii
                 </NavLink>
-                
+
                 <NavLink
                   to="/rules"
                   onClick={closeMenu}
@@ -238,10 +263,7 @@ function Header() {
                     </div>
 
                     <button
-                      onClick={() => {
-                        logoutUser();
-                        closeMenu();
-                      }}
+                      onClick={openLogoutModal}
                       className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
                     >
                       Logi välja
@@ -262,6 +284,11 @@ function Header() {
       </header>
 
       <LoginModal isOpen={isLoginOpen} onClose={closeLoginModal} />
+      <LogoutModal
+        isOpen={isLogoutOpen}
+        onClose={closeLogoutModal}
+        onConfirm={handleLogoutConfirm}
+      />
     </>
   );
 }
