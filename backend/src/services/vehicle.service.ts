@@ -24,7 +24,7 @@ interface GetMyVehiclesParams {
   userId: number;
   page: number;
   limit: number;
-  status?: "Ootel" | "Tagasi_lukatud";
+  status?: "Ootel" | "Tagasi_lukatud" | "Kinnitatud";
 }
 
 interface CreateVehicleWithFirstPhotoData {
@@ -261,11 +261,7 @@ export async function getMyVehicles(params: GetMyVehiclesParams) {
 
   const where = {
     created_by: userId,
-    status: status
-      ? status
-      : {
-          in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
-        },
+    ...(status ? { status } : {}),
   };
 
   const [items, total] = await Promise.all([
@@ -297,9 +293,6 @@ export async function getMyVehicleById(vehicleId: number, userId: number) {
     where: {
       vehicle_id: vehicleId,
       created_by: userId,
-      status: {
-        in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
-      },
     },
     include: {
       model: {

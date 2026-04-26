@@ -14,7 +14,7 @@ interface GetMyPhotosParams {
   userId: number;
   page: number;
   limit: number;
-  status?: "Ootel" | "Tagasi_lukatud";
+  status?: "Ootel" | "Tagasi_lukatud" | "Kinnitatud";
 }
 
 interface CreatePhotoData {
@@ -222,11 +222,7 @@ export async function getMyPhotos(params: GetMyPhotosParams) {
 
   const where = {
     author_id: userId,
-    status: status
-      ? status
-      : {
-          in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
-        },
+    ...(status ? { status } : {}),
   };
 
   const [items, total] = await Promise.all([
@@ -258,9 +254,6 @@ export async function getMyPhotoById(photoId: number, userId: number) {
     where: {
       photo_id: photoId,
       author_id: userId,
-      status: {
-        in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
-      },
     },
     include: photoDashboardInclude,
   });
