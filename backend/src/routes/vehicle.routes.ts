@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   getVehicles,
+  getMyVehiclesHandler,
+  getMyVehicleHandler,
   getVehicle,
   createVehicleHandler,
   updateVehicleHandler,
@@ -11,11 +13,15 @@ import {
 } from "../controllers/vehicle.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
-import upload from "../config/multer.js";
+import upload  from "../config/multer.js";
 
 const router = Router();
 
 router.get("/", getVehicles);
+
+router.get("/my", requireAuth, getMyVehiclesHandler);
+
+router.get("/my/:id", requireAuth, getMyVehicleHandler);
 
 router.get(
   "/pending",
@@ -26,27 +32,11 @@ router.get(
 
 router.get("/:id", getVehicle);
 
-router.post(
-  "/",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  upload.single("image"),
-  createVehicleHandler
-);
+router.post("/", requireAuth, upload.single("image"), createVehicleHandler);
 
-router.patch(
-  "/:id",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  updateVehicleHandler
-);
+router.patch("/:id", requireAuth, updateVehicleHandler);
 
-router.delete(
-  "/:id",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  deleteVehicleHandler
-);
+router.delete("/:id", requireAuth, deleteVehicleHandler);
 
 router.patch(
   "/:id/approve",

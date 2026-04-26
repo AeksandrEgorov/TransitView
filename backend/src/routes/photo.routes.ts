@@ -4,6 +4,8 @@ import {
   getPhotosHandler,
   getPhotoHandler,
   getVehiclePhotosHandler,
+  getMyPhotosHandler,
+  getMyPhotoHandler,
   createPhotoHandler,
   updatePhotoHandler,
   deletePhotoHandler,
@@ -13,11 +15,22 @@ import {
 } from "../controllers/photo.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
-import upload from "../config/multer.js";
+import  upload  from "../config/multer.js";
 
 const router = Router();
 
+router.post(
+  "/upload",
+  requireAuth,
+  upload.single("image"),
+  uploadPhotoHandler
+);
+
 router.get("/", getPhotosHandler);
+
+router.get("/my", requireAuth, getMyPhotosHandler);
+
+router.get("/my/:id", requireAuth, getMyPhotoHandler);
 
 router.get(
   "/pending",
@@ -30,35 +43,11 @@ router.get("/vehicle/:vehicleId", getVehiclePhotosHandler);
 
 router.get("/:id", getPhotoHandler);
 
+router.post("/", requireAuth, createPhotoHandler);
 
-router.post(
-  "/upload",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  upload.single("image"),
-  uploadPhotoHandler
-);
+router.patch("/:id", requireAuth, updatePhotoHandler);
 
-router.post(
-  "/",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  createPhotoHandler
-);
-
-router.patch(
-  "/:id",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  updatePhotoHandler
-);
-
-router.delete(
-  "/:id",
-  requireAuth,
-  requireRole("Kasutaja", "Andmebaasi_toimetaja", "Administraator"),
-  deletePhotoHandler
-);
+router.delete("/:id", requireAuth, deletePhotoHandler);
 
 router.patch(
   "/:id/approve",

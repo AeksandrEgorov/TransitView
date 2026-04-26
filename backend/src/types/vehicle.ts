@@ -13,6 +13,12 @@ export interface VehicleListQuery {
   createdTo?: string;
 }
 
+export interface MyVehicleListQuery {
+  page?: string;
+  limit?: string;
+  status?: "Ootel" | "Tagasi_lukatud";
+}
+
 export interface UpdateVehicleBody {
   model_id?: number;
   branch_id?: number | null;

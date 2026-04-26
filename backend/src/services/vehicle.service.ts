@@ -1,5 +1,6 @@
 import prisma from "../config/prisma.js";
 import type { UpdateVehicleBody } from "../types/vehicle.js";
+import { ReviewStatus } from "../generated/prisma/client.js";
 
 interface GetPublicVehiclesParams {
   page: number;
@@ -17,6 +18,13 @@ interface GetPublicVehiclesParams {
 
   createdFrom?: Date;
   createdTo?: Date;
+}
+
+interface GetMyVehiclesParams {
+  userId: number;
+  page: number;
+  limit: number;
+  status?: "Ootel" | "Tagasi_lukatud";
 }
 
 interface CreateVehicleWithFirstPhotoData {
@@ -40,6 +48,89 @@ interface CreateVehicleWithFirstPhotoData {
 
   user_id: number;
 }
+
+const vehiclePublicInclude = {
+  model: {
+    include: {
+      category: true,
+    },
+  },
+  branch: {
+    include: {
+      company: true,
+      city: {
+        include: {
+          county: true,
+        },
+      },
+    },
+  },
+  photos: {
+    where: {
+      status: "Kinnitatud" as const,
+    },
+    orderBy: {
+      created_at: "desc" as const,
+    },
+    take: 1,
+    include: {
+      city: {
+        include: {
+          county: true,
+        },
+      },
+    },
+  },
+};
+
+const vehicleDashboardInclude = {
+  model: {
+    include: {
+      category: true,
+    },
+  },
+  branch: {
+    include: {
+      company: true,
+      city: {
+        include: {
+          county: true,
+        },
+      },
+    },
+  },
+  creator: {
+    select: {
+      user_id: true,
+      username: true,
+      role: true,
+    },
+  },
+  reviewer: {
+    select: {
+      user_id: true,
+      username: true,
+    },
+  },
+  photos: {
+    where: {
+      status: {
+        in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
+      },
+    },
+    orderBy: {
+      created_at: "asc" as const,
+    },
+    take: 1,
+    include: {
+      city: {
+        include: {
+          county: true,
+        },
+      },
+    },
+  },
+};
 
 export async function getPublicVehicles(params: GetPublicVehiclesParams) {
   const {
@@ -116,6 +207,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
 
     ...(modelId ? { model_id: modelId } : {}),
     ...(branchId ? { branch_id: branchId } : {}),
+
     ...(companyId
       ? {
           branch: {
@@ -123,8 +215,10 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
           },
         }
       : {}),
+
     ...(condition ? { condition: condition as any } : {}),
     ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
+
     ...(categoryId
       ? {
           model: {
@@ -144,39 +238,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
       orderBy: {
         created_at: "desc",
       },
-      include: {
-        model: {
-          include: {
-            category: true,
-          },
-        },
-        branch: {
-          include: {
-            company: true,
-            city: {
-              include: {
-                county: true,
-              },
-            },
-          },
-        },
-        photos: {
-          where: {
-            status: "Kinnitatud",
-          },
-          orderBy: {
-            created_at: "desc",
-          },
-          take: 1,
-          include: {
-            city: {
-              include: {
-                county: true,
-              },
-            },
-          },
-        },
-      },
+      include: vehiclePublicInclude,
     }),
     prisma.vehicles.count({ where }),
   ]);
@@ -190,6 +252,111 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
       totalPages: Math.ceil(total / limit),
     },
   };
+}
+
+export async function getMyVehicles(params: GetMyVehiclesParams) {
+  const { userId, page, limit, status } = params;
+
+  const skip = (page - 1) * limit;
+
+  const where = {
+    created_by: userId,
+    status: status
+      ? status
+      : {
+          in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
+        },
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.vehicles.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: {
+        created_at: "desc",
+      },
+      include: vehicleDashboardInclude,
+    }),
+    prisma.vehicles.count({ where }),
+  ]);
+
+  return {
+    items,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+export async function getMyVehicleById(vehicleId: number, userId: number) {
+  return prisma.vehicles.findFirst({
+    where: {
+      vehicle_id: vehicleId,
+      created_by: userId,
+      status: {
+        in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
+      },
+    },
+    include: {
+      model: {
+        include: {
+          category: true,
+        },
+      },
+      branch: {
+        include: {
+          company: true,
+          city: {
+            include: {
+              county: true,
+            },
+          },
+        },
+      },
+      creator: {
+        select: {
+          user_id: true,
+          username: true,
+          role: true,
+        },
+      },
+      reviewer: {
+        select: {
+          user_id: true,
+          username: true,
+          role: true,
+        },
+      },
+      photos: {
+        where: {
+          status: {
+            in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
+          },
+        },
+        orderBy: {
+          created_at: "asc",
+        },
+        include: {
+          author: {
+            select: {
+              user_id: true,
+              username: true,
+              role: true,
+            },
+          },
+          city: {
+            include: {
+              county: true,
+            },
+          },
+        },
+      },
+    },
+  });
 }
 
 export async function getVehicleById(vehicleId: number) {
@@ -341,35 +508,7 @@ export async function getPendingVehicles(params: {
       orderBy: {
         created_at: "asc",
       },
-      include: {
-        model: {
-          include: {
-            category: true,
-          },
-        },
-        branch: {
-          include: {
-            company: true,
-            city: {
-              include: {
-                county: true,
-              },
-            },
-          },
-        },
-        creator: {
-          select: {
-            user_id: true,
-            username: true,
-          },
-        },
-        photos: {
-          orderBy: {
-            created_at: "asc",
-          },
-          take: 1,
-        },
-      },
+      include: vehicleDashboardInclude,
     }),
     prisma.vehicles.count({ where }),
   ]);
