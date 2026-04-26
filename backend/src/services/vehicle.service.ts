@@ -5,12 +5,18 @@ interface GetPublicVehiclesParams {
   page: number;
   limit: number;
   regNumber?: string;
+
   cityId?: number;
+  countyId?: number;
   categoryId?: number;
   modelId?: number;
   companyId?: number;
   branchId?: number;
+
   condition?: string;
+
+  createdFrom?: Date;
+  createdTo?: Date;
 }
 
 interface CreateVehicleWithFirstPhotoData {
@@ -41,17 +47,41 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
     limit,
     regNumber,
     cityId,
+    countyId,
     categoryId,
     modelId,
     companyId,
     branchId,
     condition,
+    createdFrom,
+    createdTo,
   } = params;
 
   const skip = (page - 1) * limit;
 
+  const branchWhere = {
+    ...(cityId ? { city_id: cityId } : {}),
+    ...(companyId ? { company_id: companyId } : {}),
+    ...(countyId
+      ? {
+          city: {
+            county_id: countyId,
+          },
+        }
+      : {}),
+  };
+
+  const createdAtWhere =
+    createdFrom || createdTo
+      ? {
+          ...(createdFrom ? { gte: createdFrom } : {}),
+          ...(createdTo ? { lte: createdTo } : {}),
+        }
+      : undefined;
+
   const where = {
     status: "Kinnitatud" as const,
+
     ...(regNumber
       ? {
           reg_number: {
@@ -60,23 +90,18 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
           },
         }
       : {}),
+
     ...(modelId ? { model_id: modelId } : {}),
     ...(branchId ? { branch_id: branchId } : {}),
     ...(condition ? { condition: condition as any } : {}),
-    ...(cityId
+    ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
+
+    ...(Object.keys(branchWhere).length > 0
       ? {
-          branch: {
-            city_id: cityId,
-          },
+          branch: branchWhere,
         }
       : {}),
-    ...(companyId
-      ? {
-          branch: {
-            company_id: companyId,
-          },
-        }
-      : {}),
+
     ...(categoryId
       ? {
           model: {
