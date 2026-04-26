@@ -1,13 +1,12 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
-import type {
-  PhotoListQuery,
-  UpdatePhotoBody,
-} from "../types/photo.js";
+import type { MyPhotoListQuery, PhotoListQuery, UpdatePhotoBody } from "../types/photo.js";
 import {
   getPublicPhotos,
   getPhotoById,
   getPhotosByVehicleId,
+  getMyPhotos,
+  getMyPhotoById,
   createPhoto,
   getPhotoForEdit,
   updatePhoto,
@@ -53,13 +52,14 @@ export async function getPhotosHandler(
 ): Promise<void> {
   try {
     const query = req.query as PhotoListQuery;
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
+    const page = Math.max(Number(query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
     const result = await getPublicPhotos({
       page,
       limit,
       cityId: query.cityId ? Number(query.cityId) : undefined,
+      countyId: query.countyId ? Number(query.countyId) : undefined,
       vehicleId: query.vehicleId ? Number(query.vehicleId) : undefined,
     });
 
@@ -102,9 +102,8 @@ export async function getVehiclePhotosHandler(
 ): Promise<void> {
   try {
     const vehicleId = Number(req.params.vehicleId);
-    const query = req.query as PhotoListQuery;
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
 
     if (Number.isNaN(vehicleId)) {
       res.status(400).json({ message: "Invalid vehicle id" });
@@ -120,6 +119,79 @@ export async function getVehiclePhotosHandler(
     res.status(200).json(result);
   } catch (error) {
     console.error("Get vehicle photos error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getMyPhotosHandler(
+  req: AuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    const query = req.query as MyPhotoListQuery;
+
+    const page = Math.max(Number(query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
+
+    if (
+      query.status &&
+      query.status !== "Ootel" &&
+      query.status !== "Tagasi_lukatud"
+    ) {
+      res.status(400).json({
+        message: "Invalid status. Allowed values: Ootel, Tagasi_lukatud",
+      });
+      return;
+    }
+
+    const result = await getMyPhotos({
+      userId: req.user.userId,
+      page,
+      limit,
+      status: query.status,
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Get my photos error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getMyPhotoHandler(
+  req: AuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    const photoId = Number(req.params.id);
+
+    if (Number.isNaN(photoId)) {
+      res.status(400).json({ message: "Invalid photo id" });
+      return;
+    }
+
+    const photo = await getMyPhotoById(photoId, req.user.userId);
+
+    if (!photo) {
+      res.status(404).json({
+        message: "Photo not found or you do not have access to it",
+      });
+      return;
+    }
+
+    res.status(200).json(photo);
+  } catch (error) {
+    console.error("Get my photo error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -304,9 +376,8 @@ export async function getPendingPhotosHandler(
   res: Response
 ): Promise<void> {
   try {
-    const query = req.query as PhotoListQuery;
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
 
     const result = await getPendingPhotos({ page, limit });
 

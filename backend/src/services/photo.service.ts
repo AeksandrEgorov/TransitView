@@ -1,11 +1,20 @@
 import prisma from "../config/prisma.js";
+import { ReviewStatus } from "../generated/prisma/client.js";
 import type { UpdatePhotoBody } from "../types/photo.js";
 
 interface GetPublicPhotosParams {
   page: number;
   limit: number;
   cityId?: number;
+  countyId?: number;
   vehicleId?: number;
+}
+
+interface GetMyPhotosParams {
+  userId: number;
+  page: number;
+  limit: number;
+  status?: "Ootel" | "Tagasi_lukatud";
 }
 
 interface CreatePhotoData {
@@ -17,16 +26,104 @@ interface CreatePhotoData {
   user_id: number;
 }
 
+const photoPublicInclude = {
+  author: {
+    select: {
+      user_id: true,
+      username: true,
+    },
+  },
+  city: {
+    include: {
+      county: true,
+    },
+  },
+  vehicle: {
+    include: {
+      model: {
+        include: {
+          category: true,
+        },
+      },
+      branch: {
+        include: {
+          company: true,
+          city: {
+            include: {
+              county: true,
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const photoDashboardInclude = {
+  author: {
+    select: {
+      user_id: true,
+      username: true,
+      role: true,
+    },
+  },
+  city: {
+    include: {
+      county: true,
+    },
+  },
+  vehicle: {
+    include: {
+      model: {
+        include: {
+          category: true,
+        },
+      },
+      branch: {
+        include: {
+          company: true,
+          city: {
+            include: {
+              county: true,
+            },
+          },
+        },
+      },
+      creator: {
+        select: {
+          user_id: true,
+          username: true,
+          role: true,
+        },
+      },
+    },
+  },
+};
+
 export async function getPublicPhotos(params: GetPublicPhotosParams) {
-  const { page, limit, cityId, vehicleId } = params;
+  const { page, limit, cityId, countyId, vehicleId } = params;
   const skip = (page - 1) * limit;
 
+  const locationFilter =
+    cityId || countyId
+      ? {
+          ...(cityId ? { city_id: cityId } : {}),
+          ...(countyId
+            ? {
+                city: {
+                  county_id: countyId,
+                },
+              }
+            : {}),
+        }
+      : {};
+
   const where = {
-    status: "Kinnitatud" as const,
-    ...(cityId ? { city_id: cityId } : {}),
+    status: ReviewStatus.Kinnitatud,
     ...(vehicleId ? { vehicle_id: vehicleId } : {}),
+    ...locationFilter,
     vehicle: {
-      status: "Kinnitatud" as const,
+      status: ReviewStatus.Kinnitatud,
     },
   };
 
@@ -38,38 +135,7 @@ export async function getPublicPhotos(params: GetPublicPhotosParams) {
       orderBy: {
         created_at: "desc",
       },
-      include: {
-        author: {
-          select: {
-            user_id: true,
-            username: true,
-          },
-        },
-        city: {
-          include: {
-            county: true,
-          },
-        },
-        vehicle: {
-          include: {
-            model: {
-              include: {
-                category: true,
-              },
-            },
-            branch: {
-              include: {
-                company: true,
-                city: {
-                  include: {
-                    county: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: photoPublicInclude,
     }),
     prisma.photos.count({ where }),
   ]);
@@ -89,43 +155,12 @@ export async function getPhotoById(photoId: number) {
   return prisma.photos.findFirst({
     where: {
       photo_id: photoId,
-      status: "Kinnitatud",
+      status: ReviewStatus.Kinnitatud,
       vehicle: {
-        status: "Kinnitatud",
+        status: ReviewStatus.Kinnitatud,
       },
     },
-    include: {
-      author: {
-        select: {
-          user_id: true,
-          username: true,
-        },
-      },
-      city: {
-        include: {
-          county: true,
-        },
-      },
-      vehicle: {
-        include: {
-          model: {
-            include: {
-              category: true,
-            },
-          },
-          branch: {
-            include: {
-              company: true,
-              city: {
-                include: {
-                  county: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: photoPublicInclude,
   });
 }
 
@@ -139,9 +174,9 @@ export async function getPhotosByVehicleId(params: {
 
   const where = {
     vehicle_id: vehicleId,
-    status: "Kinnitatud" as const,
+    status: ReviewStatus.Kinnitatud,
     vehicle: {
-      status: "Kinnitatud" as const,
+      status: ReviewStatus.Kinnitatud,
     },
   };
 
@@ -181,6 +216,56 @@ export async function getPhotosByVehicleId(params: {
   };
 }
 
+export async function getMyPhotos(params: GetMyPhotosParams) {
+  const { userId, page, limit, status } = params;
+  const skip = (page - 1) * limit;
+
+  const where = {
+    author_id: userId,
+    status: status
+      ? status
+      : {
+          in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
+        },
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.photos.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: {
+        created_at: "desc",
+      },
+      include: photoDashboardInclude,
+    }),
+    prisma.photos.count({ where }),
+  ]);
+
+  return {
+    items,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+export async function getMyPhotoById(photoId: number, userId: number) {
+  return prisma.photos.findFirst({
+    where: {
+      photo_id: photoId,
+      author_id: userId,
+      status: {
+        in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
+      },
+    },
+    include: photoDashboardInclude,
+  });
+}
+
 export async function createPhoto(data: CreatePhotoData) {
   return prisma.photos.create({
     data: {
@@ -190,7 +275,7 @@ export async function createPhoto(data: CreatePhotoData) {
       place: data.place ?? null,
       taken_at: data.taken_at ? new Date(data.taken_at) : null,
       file_path: data.file_path,
-      status: "Ootel",
+      status: ReviewStatus.Ootel,
       review_comment: null,
     },
   });
@@ -235,7 +320,7 @@ export async function getPendingPhotos(params: {
   const skip = (page - 1) * limit;
 
   const where = {
-    status: "Ootel" as const,
+    status: ReviewStatus.Ootel,
   };
 
   const [items, total] = await Promise.all([
@@ -246,30 +331,7 @@ export async function getPendingPhotos(params: {
       orderBy: {
         created_at: "asc",
       },
-      include: {
-        author: {
-          select: {
-            user_id: true,
-            username: true,
-          },
-        },
-        city: {
-          include: {
-            county: true,
-          },
-        },
-        vehicle: {
-          include: {
-            model: true,
-            branch: {
-              include: {
-                company: true,
-                city: true,
-              },
-            },
-          },
-        },
-      },
+      include: photoDashboardInclude,
     }),
     prisma.photos.count({ where }),
   ]);
@@ -291,7 +353,7 @@ export async function approvePhoto(photoId: number) {
       photo_id: photoId,
     },
     data: {
-      status: "Kinnitatud",
+      status: ReviewStatus.Kinnitatud,
       reviewed_at: new Date(),
       review_comment: null,
     },
@@ -304,7 +366,7 @@ export async function rejectPhoto(photoId: number, reviewComment: string) {
       photo_id: photoId,
     },
     data: {
-      status: "Tagasi_lukatud",
+      status: ReviewStatus.Tagasi_lukatud,
       reviewed_at: new Date(),
       review_comment: reviewComment,
     },

@@ -2,15 +2,14 @@ export interface PhotoListQuery {
   page?: string;
   limit?: string;
   cityId?: string;
+  countyId?: string;
   vehicleId?: string;
 }
 
-export interface CreatePhotoBody {
-  vehicle_id: number;
-  city_id?: number | null;
-  place?: string | null;
-  taken_at?: string | null;
-  file_path: string;
+export interface MyPhotoListQuery {
+  page?: string;
+  limit?: string;
+  status?: "Ootel" | "Tagasi_lukatud";
 }
 
 export interface UpdatePhotoBody {

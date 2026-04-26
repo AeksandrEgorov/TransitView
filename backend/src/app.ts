@@ -6,6 +6,8 @@ import vehicleRoutes from "./routes/vehicle.routes.js";
 import photoRoutes from "./routes/photo.routes.js";
 import referenceRoutes from "./routes/reference.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import vehicleManageRoutes from "./routes/vehicleManage.routes.js";
+import photoManageRoutes from "./routes/photoManage.routes.js";
 
 dotenv.config();
 
@@ -20,7 +22,9 @@ app.get("/", (_req: Request, res: Response) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/manage/vehicles", vehicleManageRoutes);
 app.use("/api/photos", photoRoutes);
+app.use("/api/manage/photos", photoManageRoutes);
 app.use("/api/reference", referenceRoutes);
 app.use("/api/users", userRoutes);
 
