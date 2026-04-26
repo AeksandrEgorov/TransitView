@@ -59,18 +59,6 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
 
   const skip = (page - 1) * limit;
 
-  const branchWhere = {
-    ...(cityId ? { city_id: cityId } : {}),
-    ...(companyId ? { company_id: companyId } : {}),
-    ...(countyId
-      ? {
-          city: {
-            county_id: countyId,
-          },
-        }
-      : {}),
-  };
-
   const createdAtWhere =
     createdFrom || createdTo
       ? {
@@ -78,6 +66,41 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
           ...(createdTo ? { lte: createdTo } : {}),
         }
       : undefined;
+
+  const locationFilter =
+    cityId || countyId
+      ? {
+          OR: [
+            {
+              branch: {
+                ...(cityId ? { city_id: cityId } : {}),
+                ...(countyId
+                  ? {
+                      city: {
+                        county_id: countyId,
+                      },
+                    }
+                  : {}),
+              },
+            },
+            {
+              photos: {
+                some: {
+                  status: "Kinnitatud" as const,
+                  ...(cityId ? { city_id: cityId } : {}),
+                  ...(countyId
+                    ? {
+                        city: {
+                          county_id: countyId,
+                        },
+                      }
+                    : {}),
+                },
+              },
+            },
+          ],
+        }
+      : {};
 
   const where = {
     status: "Kinnitatud" as const,
@@ -93,15 +116,15 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
 
     ...(modelId ? { model_id: modelId } : {}),
     ...(branchId ? { branch_id: branchId } : {}),
-    ...(condition ? { condition: condition as any } : {}),
-    ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
-
-    ...(Object.keys(branchWhere).length > 0
+    ...(companyId
       ? {
-          branch: branchWhere,
+          branch: {
+            company_id: companyId,
+          },
         }
       : {}),
-
+    ...(condition ? { condition: condition as any } : {}),
+    ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
     ...(categoryId
       ? {
           model: {
@@ -109,6 +132,8 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
           },
         }
       : {}),
+
+    ...locationFilter,
   };
 
   const [items, total] = await Promise.all([
@@ -143,6 +168,13 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
             created_at: "desc",
           },
           take: 1,
+          include: {
+            city: {
+              include: {
+                county: true,
+              },
+            },
+          },
         },
       },
     }),
