@@ -9,7 +9,7 @@ export interface PhotoListQuery {
 export interface MyPhotoListQuery {
   page?: string;
   limit?: string;
-  status?: "Ootel" | "Tagasi_lukatud";
+  status?: "Ootel" | "Tagasi_lukatud" | "Kinnitatud";
 }
 
 export interface UpdatePhotoBody {

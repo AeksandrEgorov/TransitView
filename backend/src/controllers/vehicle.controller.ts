@@ -119,10 +119,11 @@ export async function getMyVehiclesHandler(
     if (
       query.status &&
       query.status !== "Ootel" &&
-      query.status !== "Tagasi_lukatud"
+      query.status !== "Tagasi_lukatud" &&
+      query.status !== "Kinnitatud"
     ) {
       res.status(400).json({
-        message: "Invalid status. Allowed values: Ootel, Tagasi_lukatud",
+        message: "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
       });
       return;
     }
