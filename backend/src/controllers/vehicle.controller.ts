@@ -19,6 +19,27 @@ import {
 } from "../validators/vehicle.validator.js";
 import { rejectSchema } from "../validators/moderation.validator.js";
 
+function parseDateQuery(
+  value: string | undefined,
+  endOfDay = false
+): Date | null | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+  const date = isDateOnly
+    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
 export async function getVehicles(
   req: AuthRequest,
   res: Response
@@ -29,16 +50,46 @@ export async function getVehicles(
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
+    const createdFrom = parseDateQuery(query.createdFrom);
+    const createdTo = parseDateQuery(query.createdTo, true);
+
+    if (createdFrom === null) {
+      res.status(400).json({
+        message: "Invalid createdFrom date format",
+      });
+      return;
+    }
+
+    if (createdTo === null) {
+      res.status(400).json({
+        message: "Invalid createdTo date format",
+      });
+      return;
+    }
+
+    if (createdFrom && createdTo && createdFrom > createdTo) {
+      res.status(400).json({
+        message: "createdFrom cannot be later than createdTo",
+      });
+      return;
+    }
+
     const result = await getPublicVehicles({
       page,
       limit,
       regNumber: query.regNumber,
+
       cityId: query.cityId ? Number(query.cityId) : undefined,
+      countyId: query.countyId ? Number(query.countyId) : undefined,
       categoryId: query.categoryId ? Number(query.categoryId) : undefined,
       modelId: query.modelId ? Number(query.modelId) : undefined,
       companyId: query.companyId ? Number(query.companyId) : undefined,
       branchId: query.branchId ? Number(query.branchId) : undefined,
+
       condition: query.condition,
+
+      createdFrom,
+      createdTo,
     });
 
     res.status(200).json(result);

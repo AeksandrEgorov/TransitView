@@ -3,11 +3,14 @@ export interface VehicleListQuery {
   limit?: string;
   regNumber?: string;
   cityId?: string;
+  countyId?: string;
   categoryId?: string;
   modelId?: string;
   companyId?: string;
   branchId?: string;
   condition?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }
 
 export interface UpdateVehicleBody {
