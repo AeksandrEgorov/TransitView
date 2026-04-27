@@ -56,7 +56,7 @@ function Header() {
               <NavLink
                 to="/"
                 onClick={closeMenu}
-                className="text-2xl font-extrabold tracking-tight text-white"
+                className="text-2xl font-extrabold tracking-tight text-white transition hover:opacity-85"
               >
                 TransitView
               </NavLink>
@@ -68,7 +68,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white shadow-inner"
-                        : "text-slate-200 hover:bg-white/8 hover:text-white"
+                        : "text-slate-300 hover:bg-white/5 hover:text-white"
                     }`
                   }
                 >
@@ -81,7 +81,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white shadow-inner"
-                        : "text-slate-200 hover:bg-white/8 hover:text-white"
+                        : "text-slate-300 hover:bg-white/5 hover:text-white"
                     }`
                   }
                 >
@@ -94,7 +94,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white shadow-inner"
-                        : "text-slate-200 hover:bg-white/8 hover:text-white"
+                        : "text-slate-300 hover:bg-white/5 hover:text-white"
                     }`
                   }
                 >
@@ -107,7 +107,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white shadow-inner"
-                        : "text-slate-200 hover:bg-white/8 hover:text-white"
+                        : "text-slate-300 hover:bg-white/5 hover:text-white"
                     }`
                   }
                 >
@@ -121,7 +121,7 @@ function Header() {
                       `${navBaseClass} ${
                         isActive
                           ? "bg-slate-900 text-white shadow-inner"
-                          : "text-slate-200 hover:bg-white/8 hover:text-white"
+                          : "text-slate-300 hover:bg-white/5 hover:text-white"
                       }`
                     }
                   >
@@ -186,7 +186,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white"
-                        : "bg-white/5 text-slate-200 hover:bg-white/10"
+                        : "bg-white/5 text-slate-300 hover:bg-white/8 hover:text-white"
                     }`
                   }
                 >
@@ -200,7 +200,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white"
-                        : "bg-white/5 text-slate-200 hover:bg-white/10"
+                        : "bg-white/5 text-slate-300 hover:bg-white/8 hover:text-white"
                     }`
                   }
                 >
@@ -214,7 +214,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white"
-                        : "bg-white/5 text-slate-200 hover:bg-white/10"
+                        : "bg-white/5 text-slate-300 hover:bg-white/8 hover:text-white"
                     }`
                   }
                 >
@@ -228,7 +228,7 @@ function Header() {
                     `${navBaseClass} ${
                       isActive
                         ? "bg-slate-900 text-white"
-                        : "bg-white/5 text-slate-200 hover:bg-white/10"
+                        : "bg-white/5 text-slate-300 hover:bg-white/8 hover:text-white"
                     }`
                   }
                 >
@@ -243,7 +243,7 @@ function Header() {
                       `${navBaseClass} ${
                         isActive
                           ? "bg-slate-900 text-white"
-                          : "bg-white/5 text-slate-200 hover:bg-white/10"
+                          : "bg-white/5 text-slate-300 hover:bg-white/8 hover:text-white"
                       }`
                     }
                   >

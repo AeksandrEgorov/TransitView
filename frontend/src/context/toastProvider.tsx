@@ -15,21 +15,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const showToast = useCallback(
-    (toast: Omit<ToastItem, "id">) => {
-      const id = generateToastId();
+  const showToast = useCallback((toast: Omit<ToastItem, "id">) => {
+    const id = generateToastId();
 
-      setToasts((prev) => [
+    setToasts((prev) => {
+      const duplicate = prev.some(
+        (item) =>
+          item.variant === toast.variant &&
+          item.title === toast.title &&
+          item.message === toast.message
+      );
+
+      if (duplicate) {
+        return prev;
+      }
+
+      return [
         ...prev,
         {
           id,
           duration: 5000,
           ...toast,
         },
-      ]);
-    },
-    []
-  );
+      ];
+    });
+  }, []);
 
   const value = useMemo(
     () => ({

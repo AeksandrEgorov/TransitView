@@ -1,6 +1,7 @@
 import { GALLERY_RULES } from "../data/rulesData";
 import { type Rule } from "../types/rule";
 import { AlertTriangle, Ban, Info, FileText } from "lucide-react";
+import PageHero from "../components/ui/PageHero";
 
 const formatDescription = (text: string) => {
   const parts = text.split(/(NB!|(?:\d+\.)+(?:\d+\.)?|\(vt\..*?\))/g);
@@ -44,17 +45,11 @@ function GalleryRules() {
     };
     return (
         <div className="space-y-8 p-4 sm:p-0">
-        <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
-            Reeglid
-            </p>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-            TransitView saidi reeglid
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-            TransitView keskkonna kvaliteedi, korra ja turvalisuse tagamiseks peavad kõik kasutajad ning lisatud sisu vastama järgmistele üldistele eeskirjadele ja nõuetele
-            </p>
-        </div>
+          <PageHero
+            eyebrow="Reeglid"
+            title="TransitView saidi reeglid"
+            description="TransitView keskkonna kvaliteedi, korra ja turvalisuse tagamiseks peavad kõik kasutajad ning lisatud sisu vastama üldistele eeskirjadele ja nõuetele."
+          />
         <div className="grid gap-6 sm:grid-cols-2">
             {GALLERY_RULES.map((rule: Rule) => {
             const currentStyle = variantStyles[rule.variant as keyof typeof variantStyles] || variantStyles.default;
