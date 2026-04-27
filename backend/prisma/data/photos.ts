@@ -16,7 +16,7 @@ export const photos = [
     place: "Narva Lennujaam",
     takenAt: new Date("2025-09-13T09:30:00"),
     filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_2_ahoih0.jpg",
-    status: "Ootel",
+    status: "Kinnitatud",
   },
   {
     regNumber: "1559",
