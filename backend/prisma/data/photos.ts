@@ -5,10 +5,9 @@ export const photos = [
     cityName: "Tallinn",
     place: "Pärnu mnt",
     takenAt: new Date("2023-10-13T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_1_jpvsdl.jpg",
-    cloudinaryPublicId: "Pilt_1_jpvsdl",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_1_jpvsdl.jpg",
     status: "Kinnitatud",
+    cloudinaryPublicId: "",
     reviewComment: "",
   },
   {
@@ -17,9 +16,7 @@ export const photos = [
     cityName: "Soldina",
     place: "Narva Lennujaam",
     takenAt: new Date("2025-09-13T09:30:00"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_2_ahoih0.jpg",
-    cloudinaryPublicId: "Pilt_2_ahoih0",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_2_ahoih0.jpg",
     status: "Kinnitatud",
   },
   {
@@ -28,9 +25,7 @@ export const photos = [
     cityName: "Vaivara",
     place: "Vaivara jaam",
     takenAt: new Date("2021-09-22T09:30:00"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649307/Pilt_3_muly7q.jpg",
-    cloudinaryPublicId: "Pilt_3_muly7q",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649307/Pilt_3_muly7q.jpg",
     status: "Kinnitatud",
   },
   {
@@ -39,9 +34,7 @@ export const photos = [
     cityName: "Narva",
     place: "Madise tn",
     takenAt: new Date("2021-11-30T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649307/Pilt_4_hcsdro.jpg",
-    cloudinaryPublicId: "Pilt_4_hcsdro",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649307/Pilt_4_hcsdro.jpg",
     status: "Kinnitatud",
   },
   {
@@ -50,9 +43,7 @@ export const photos = [
     cityName: "Kudruküla",
     place: "91 Narva - Narva-Jõesuu - Hiiemetsa",
     takenAt: new Date("2022-09-30T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649309/Pilt_5_wmkdxu.jpg",
-    cloudinaryPublicId: "Pilt_5_wmkdxu",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649309/Pilt_5_wmkdxu.jpg",
     status: "Kinnitatud",
   },
   {
@@ -61,9 +52,7 @@ export const photos = [
     cityName: "Narva",
     place: "Tallinna mnt",
     takenAt: new Date("2022-10-25T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649309/Pilt_6_ag1tdh.jpg",
-    cloudinaryPublicId: "Pilt_6_ag1tdh",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649309/Pilt_6_ag1tdh.jpg",
     status: "Kinnitatud",
   },
   {
@@ -72,9 +61,7 @@ export const photos = [
     cityName: "Linna",
     place: "E20 Tallinn - Narva",
     takenAt: new Date("2025-02-04T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649310/Pilt_7_r7gxa4.jpg",
-    cloudinaryPublicId: "Pilt_7_r7gxa4",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649310/Pilt_7_r7gxa4.jpg",
     status: "Kinnitatud",
   },
   {
@@ -83,9 +70,7 @@ export const photos = [
     cityName: "Soldina",
     place: "E20 Tallinn - Narva",
     takenAt: new Date("2025-05-22T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649310/Pilt_8_kpvz7j.jpg",
-    cloudinaryPublicId: "Pilt_8_kpvz7j",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649310/Pilt_8_kpvz7j.jpg",
     status: "Kinnitatud",
   },
   {
@@ -94,9 +79,7 @@ export const photos = [
     cityName: "Hiiemetsa",
     place: "145 Hiiemetsa - Auvere",
     takenAt: new Date("2025-06-25T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649311/Pilt_9_efgjjg.jpg",
-    cloudinaryPublicId: "Pilt_9_efgjjg",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649311/Pilt_9_efgjjg.jpg",
     status: "Kinnitatud",
   },
   {
@@ -105,9 +88,7 @@ export const photos = [
     cityName: "Soldina",
     place: "E20 Tallinn - Narva",
     takenAt: new Date("2025-08-27T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649312/Pilt_10_gplxbb.jpg",
-    cloudinaryPublicId: "Pilt_10_gplxbb",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649312/Pilt_10_gplxbb.jpg",
     status: "Kinnitatud",
   },
   {
@@ -116,9 +97,7 @@ export const photos = [
     cityName: "Narva",
     place: "Paul Kerese tn",
     takenAt: new Date("2025-10-13T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649313/Pilt_11_k0xtsi.jpg",
-    cloudinaryPublicId: "Pilt_11_k0xtsi",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649313/Pilt_11_k0xtsi.jpg",
     status: "Kinnitatud",
   },
   {
@@ -127,9 +106,7 @@ export const photos = [
     cityName: "Tallinn",
     place: "bussijaam",
     takenAt: new Date("2025-12-24T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649314/Pilt_12_t6y4xx.jpg",
-    cloudinaryPublicId: "Pilt_12_t6y4xx",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649314/Pilt_12_t6y4xx.jpg",
     status: "Kinnitatud",
   },
   {
@@ -138,9 +115,7 @@ export const photos = [
     cityName: "Narva",
     place: "Rahu tn",
     takenAt: new Date("2026-01-07T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649314/Pilt_13_p6a4as.jpg",
-    cloudinaryPublicId: "Pilt_13_p6a4as",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649314/Pilt_13_p6a4as.jpg",
     status: "Kinnitatud",
   },
   {
@@ -149,9 +124,7 @@ export const photos = [
     cityName: "Narva",
     place: "Tallinna mnt",
     takenAt: new Date("2026-01-08T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649315/Pilt_14_qerqmu.jpg",
-    cloudinaryPublicId: "Pilt_14_qerqmu",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649315/Pilt_14_qerqmu.jpg",
     status: "Kinnitatud",
   },
   {
@@ -160,9 +133,7 @@ export const photos = [
     cityName: "Soldina",
     place: "E20 Tallinn - Narva",
     takenAt: new Date("2026-01-08T10:02:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649316/Pilt_15_mtyno4.jpg",
-    cloudinaryPublicId: "Pilt_15_mtyno4",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649316/Pilt_15_mtyno4.jpg",
     status: "Kinnitatud",
   },
   {
@@ -171,9 +142,7 @@ export const photos = [
     cityName: "Narva",
     place: "Jõesuu tn",
     takenAt: new Date("2026-01-09T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649317/Pilt_16_emba60.jpg",
-    cloudinaryPublicId: "Pilt_16_emba60",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649317/Pilt_16_emba60.jpg",
     status: "Kinnitatud",
   },
   {
@@ -182,9 +151,7 @@ export const photos = [
     cityName: "Narva",
     place: "Jõesuu tn",
     takenAt: new Date("2026-01-09T10:02:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649317/Pilt_17_h0xtxr.jpg",
-    cloudinaryPublicId: "Pilt_17_h0xtxr",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649317/Pilt_17_h0xtxr.jpg",
     status: "Kinnitatud",
   },
   {
@@ -193,9 +160,7 @@ export const photos = [
     cityName: "Vodava",
     place: "E20 Tallinn - Narva",
     takenAt: new Date("2026-02-04T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649318/Pilt_18_neara8.jpg",
-    cloudinaryPublicId: "Pilt_18_neara8",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649318/Pilt_18_neara8.jpg",
     status: "Kinnitatud",
   },
   {
@@ -204,9 +169,7 @@ export const photos = [
     cityName: "Kohtla-Järve",
     place: "Järveküla tee",
     takenAt: new Date("2026-03-25T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649319/Pilt_19_kjiffo.jpg",
-    cloudinaryPublicId: "Pilt_19_kjiffo",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649319/Pilt_19_kjiffo.jpg",
     status: "Kinnitatud",
   },
   {
@@ -215,9 +178,7 @@ export const photos = [
     cityName: "Tartu",
     place: "Nõlvakaare tn",
     takenAt: new Date("2023-04-22T10:01:12"),
-    filePath:
-      "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_20_iuxbsx.jpg",
-    cloudinaryPublicId: "Pilt_20_iuxbsx",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_20_iuxbsx.jpg",
     status: "Kinnitatud",
   },
 ];

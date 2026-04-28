@@ -1,6 +1,7 @@
 import prisma from "../config/prisma.js";
 import { ReviewStatus } from "../generated/prisma/client.js";
 import type { UpdatePhotoBody } from "../types/photo.js";
+import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 
 interface GetPublicPhotosParams {
   page: number;
@@ -285,7 +286,17 @@ export async function getPhotoForEdit(photoId: number) {
 }
 
 export async function updatePhoto(photoId: number, data: UpdatePhotoBody) {
-  return prisma.photos.update({
+  const oldPhoto = await prisma.photos.findUnique({
+    where: {
+      photo_id: photoId,
+    },
+  });
+
+  if (!oldPhoto) {
+    return null;
+  }
+
+  const updatedPhoto = await prisma.photos.update({
     where: {
       photo_id: photoId,
     },
@@ -301,14 +312,49 @@ export async function updatePhoto(photoId: number, data: UpdatePhotoBody) {
         : {}),
     },
   });
+
+  const imageWasReplaced =
+    data.cloudinary_public_id &&
+    oldPhoto.cloudinary_public_id &&
+    data.cloudinary_public_id !== oldPhoto.cloudinary_public_id;
+
+  if (imageWasReplaced) {
+    try {
+      await deleteCloudinaryImage(oldPhoto.cloudinary_public_id);
+    } catch (error) {
+      console.error("Failed to delete old Cloudinary image:", error);
+    }
+  }
+
+  return updatedPhoto;
 }
 
 export async function deletePhoto(photoId: number) {
-  return prisma.photos.delete({
+  const photo = await prisma.photos.findUnique({
     where: {
       photo_id: photoId,
     },
   });
+
+  if (!photo) {
+    return null;
+  }
+
+  await prisma.photos.delete({
+    where: {
+      photo_id: photoId,
+    },
+  });
+
+  if (photo.cloudinary_public_id) {
+    try {
+      await deleteCloudinaryImage(photo.cloudinary_public_id);
+    } catch (error) {
+      console.error("Failed to delete Cloudinary image:", error);
+    }
+  }
+
+  return photo;
 }
 
 export async function getPendingPhotos(params: {
