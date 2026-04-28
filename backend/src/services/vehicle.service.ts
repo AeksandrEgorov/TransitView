@@ -395,6 +395,7 @@ export async function getVehicleById(vehicleId: number) {
         orderBy: {
           created_at: "desc",
         },
+        take: 1,
         include: {
           author: {
             select: {

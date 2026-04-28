@@ -24,31 +24,54 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
+const DB_SCHEMA = process.env.DB_SCHEMA ?? "transitview";
+
+function table(name: string) {
+  return `"${DB_SCHEMA}"."${name}"`;
+}
+
+async function truncateAllTables() {
+  console.log("Cleaning database with TRUNCATE...");
+
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      ${table("Photos")},
+      ${table("Vehicles")},
+      ${table("Company_branches")},
+      ${table("Companies")},
+      ${table("Models")},
+      ${table("Categories")},
+      ${table("Cities")},
+      ${table("Counties")},
+      ${table("Users")}
+    RESTART IDENTITY CASCADE;
+  `);
+
+  console.log("Database cleaned. Identity counters restarted.");
+}
+
 async function main() {
   console.log("Seeding database...");
 
-  // DELETE OLD DATA
-  await prisma.photos.deleteMany();
-  await prisma.vehicles.deleteMany();
-  await prisma.company_branches.deleteMany();
-  await prisma.companies.deleteMany();
-  await prisma.models.deleteMany();
-  await prisma.categories.deleteMany();
-  await prisma.cities.deleteMany();
-  await prisma.counties.deleteMany();
-  await prisma.users.deleteMany();
+  await truncateAllTables();
 
-  // COUNTIES
+  // Counties
+  console.log("Seeding counties...");
+
   for (const county of counties) {
     await prisma.counties.create({
       data: county,
     });
   }
 
-  // CITIES
+  // Cities
+  console.log("Seeding cities...");
+
   for (const city of cities) {
     const county = await prisma.counties.findFirstOrThrow({
-      where: { name: city.countyName },
+      where: {
+        name: city.countyName,
+      },
     });
 
     await prisma.cities.create({
@@ -59,17 +82,23 @@ async function main() {
     });
   }
 
-  // CATEGORIES
+  // Categories
+  console.log("Seeding categories...");
+
   for (const category of categories) {
     await prisma.categories.create({
       data: category,
     });
   }
 
-  // MODELS
+  // Models
+  console.log("Seeding models...");
+
   for (const model of models) {
     const category = await prisma.categories.findFirstOrThrow({
-      where: { name: model.categoryName },
+      where: {
+        name: model.categoryName,
+      },
     });
 
     await prisma.models.create({
@@ -81,10 +110,14 @@ async function main() {
     });
   }
 
-  // COMPANIES
+  // Companies
+  console.log("Seeding companies...");
+
   for (const company of companies) {
     const city = await prisma.cities.findFirstOrThrow({
-      where: { name: company.cityName },
+      where: {
+        name: company.cityName,
+      },
     });
 
     await prisma.companies.create({
@@ -95,14 +128,20 @@ async function main() {
     });
   }
 
-  // COMPANY BRANCHES
+  // Company branches
+  console.log("Seeding company branches...");
+
   for (const branch of companyBranches) {
     const company = await prisma.companies.findFirstOrThrow({
-      where: { name: branch.companyName },
+      where: {
+        name: branch.companyName,
+      },
     });
 
     const city = await prisma.cities.findFirstOrThrow({
-      where: { name: branch.cityName },
+      where: {
+        name: branch.cityName,
+      },
     });
 
     await prisma.company_branches.create({
@@ -114,8 +153,9 @@ async function main() {
     });
   }
 
-  
-  // USERS
+  // Users
+  console.log("Seeding users...");
+
   for (const user of users) {
     const passwordHash = await bcrypt.hash(user.password, 10);
 
@@ -128,7 +168,9 @@ async function main() {
     });
   }
 
-  // VEHICLES  
+  // Vehicles
+  console.log("Seeding vehicles...");
+
   for (const vehicle of vehicles) {
     const model = await prisma.models.findFirstOrThrow({
       where: {
@@ -138,18 +180,24 @@ async function main() {
     });
 
     const creator = await prisma.users.findFirstOrThrow({
-      where: { username: vehicle.createdByUsername },
+      where: {
+        username: vehicle.createdByUsername,
+      },
     });
 
     const reviewer = vehicle.reviewedByUsername
       ? await prisma.users.findFirstOrThrow({
-          where: { username: vehicle.reviewedByUsername },
+          where: {
+            username: vehicle.reviewedByUsername,
+          },
         })
       : null;
 
     const branch = vehicle.branchName
       ? await prisma.company_branches.findFirstOrThrow({
-          where: { branch_name: vehicle.branchName },
+          where: {
+            branch_name: vehicle.branchName,
+          },
         })
       : null;
 
@@ -158,11 +206,11 @@ async function main() {
         reg_number: vehicle.regNumber,
         model_id: model.model_id,
         branch_id: branch?.branch_id ?? null,
-        vla_year: vehicle.vlaYear ?? null,
-        vin_code: vehicle.vinCode ?? null,
-        chassis: vehicle.chassis ?? null,
+        vla_year: vehicle.vlaYear,
+        vin_code: vehicle.vinCode,
+        chassis: vehicle.chassis,
+        condition: vehicle.condition as VehicleCondition,
         status: vehicle.status as ReviewStatus,
-        condition: (vehicle.condition ?? "Teadmata") as VehicleCondition,
         created_by: creator.user_id,
         reviewed_by: reviewer?.user_id ?? null,
         reviewed_at: reviewer ? new Date() : null,
@@ -171,19 +219,27 @@ async function main() {
     });
   }
 
-  // PHOTOS
+  // Photos
+  console.log("Seeding photos...");
+
   for (const photo of photos) {
     const vehicle = await prisma.vehicles.findFirstOrThrow({
-      where: { reg_number: photo.regNumber },
+      where: {
+        reg_number: photo.regNumber,
+      },
     });
 
     const author = await prisma.users.findFirstOrThrow({
-      where: { username: photo.authorUsername },
+      where: {
+        username: photo.authorUsername,
+      },
     });
 
     const city = photo.cityName
       ? await prisma.cities.findFirstOrThrow({
-          where: { name: photo.cityName },
+          where: {
+            name: photo.cityName,
+          },
         })
       : null;
 
@@ -193,7 +249,7 @@ async function main() {
         author_id: author.user_id,
         city_id: city?.city_id ?? null,
         place: photo.place ?? null,
-        taken_at: photo.takenAt ?? null,
+        taken_at: photo.takenAt ? new Date(photo.takenAt) : null,
         file_path: photo.filePath,
         status: photo.status as ReviewStatus,
         reviewed_at: photo.status === "Kinnitatud" ? new Date() : null,
@@ -202,7 +258,7 @@ async function main() {
     });
   }
 
-  console.log("Seed completed.");
+  console.log("Seed completed successfully.");
 }
 
 main()
