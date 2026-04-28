@@ -1,5 +1,7 @@
+import { Link } from "react-router-dom";
 import type { VehicleItem } from "../../types/vehicle";
 import { formatVehicleCondition } from "../../utils/formatters";
+import { getCloudinaryImageUrl } from "../../utils/cloudinary";
 
 interface Props {
   vehicle: VehicleItem;
@@ -30,19 +32,18 @@ function getConditionBadgeClass(condition: VehicleItem["condition"]) {
 }
 
 function VehicleCard({ vehicle }: Props) {
-  const imageUrl =
-    vehicle.photos[0]?.file_path ||
-    "https://placehold.co/800x500/e2e8f0/475569?text=TransitView";
-
   const firstPhoto = vehicle.photos[0];
 
-  const locationLabel = vehicle.branch
-    ? `${vehicle.branch.city.name}, ${vehicle.branch.city.county.name}`
-    : firstPhoto?.city
+  const imageUrl = firstPhoto?.file_path
+    ? getCloudinaryImageUrl(
+        firstPhoto.file_path,
+        "w_700,h_450,c_fill,q_auto,f_auto"
+      )
+    : "https://placehold.co/800x500/e2e8f0/475569?text=TransitView";
+
+  const locationLabel = firstPhoto?.city
     ? `${firstPhoto.city.name}, ${firstPhoto.city.county.name}`
     : "Asukoht teadmata";
-
-  const companyLabel = vehicle.branch?.company.name ?? "Ettevõte teadmata";
 
   return (
     <article className="group overflow-hidden rounded-3xl bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(15,23,42,0.12)]">
@@ -50,6 +51,7 @@ function VehicleCard({ vehicle }: Props) {
         <img
           src={imageUrl}
           alt={vehicle.reg_number}
+          loading="lazy"
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
         />
 
@@ -96,28 +98,21 @@ function VehicleCard({ vehicle }: Props) {
           </div>
         </div>
 
-        <div className="space-y-3 text-sm text-slate-600">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Asukoht
-            </p>
-            <p className="mt-1 font-medium text-slate-800">{locationLabel}</p>
-          </div>
-
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Ettevõte
-            </p>
-            <p className="mt-1 font-medium text-slate-800">{companyLabel}</p>
-          </div>
+        <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Asukoht
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">
+            {locationLabel}
+          </p>
         </div>
 
-        <button
-          type="button"
-          className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-600"
+        <Link
+          to={`/vehicles/${vehicle.vehicle_id}`}
+          className="block w-full rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-600"
         >
           Vaata lähemalt
-        </button>
+        </Link>
       </div>
     </article>
   );

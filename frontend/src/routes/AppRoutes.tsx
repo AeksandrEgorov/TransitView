@@ -5,17 +5,19 @@ import GalleryPage from "../pages/GalleryPage";
 import DashboardPage from "../pages/DashboardPage";
 import ProtectedRoute from "./ProtectedRoute";
 import GalleryRules from "../pages/GalleryRules";
-import Administration from "../pages/Contacts";
+import ContactsPage from "../pages/Contacts";
 import NotFoundPage from "../pages/NotFoundPage";
+import VehicleDetailPage from "../pages/VehicleDetailPage";
 
 function AppRoutes() {
   return (
     <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/vehicles/:id" element={<VehicleDetailPage />} />
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/rules" element={<GalleryRules />} />
-        <Route path="/contacts" element={<Administration />} />
+        <Route path="/contacts" element={<ContactsPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />

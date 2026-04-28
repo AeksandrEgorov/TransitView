@@ -5,12 +5,37 @@ export type VehicleCondition =
   | "Müüdud"
   | "Teadmata";
 
+export type ReviewStatus = "Ootel" | "Kinnitatud" | "Tagasi_lukatud";
+
+export interface VehicleCounty {
+  county_id: number;
+  name: string;
+}
+
+export interface VehicleCity {
+  city_id: number;
+  name: string;
+  county: VehicleCounty;
+}
+
+export interface VehiclePhotoAuthor {
+  user_id: number;
+  username: string;
+}
+
 export interface VehiclePhoto {
   photo_id: number;
-  file_path: string;
-  created_at: string;
+  vehicle_id?: number;
+  author_id?: number;
+  city_id?: number | null;
   place?: string | null;
+  taken_at?: string | null;
+  file_path: string;
+  status?: ReviewStatus;
+  review_comment?: string | null;
+  created_at: string;
   city?: VehicleCity | null;
+  author?: VehiclePhotoAuthor;
 }
 
 export interface VehicleCategory {
@@ -30,22 +55,17 @@ export interface VehicleCompany {
   name: string;
 }
 
-export interface VehicleCounty {
-  county_id: number;
-  name: string;
-}
-
-export interface VehicleCity {
-  city_id: number;
-  name: string;
-  county: VehicleCounty;
-}
-
 export interface VehicleBranch {
   branch_id: number;
   branch_name: string | null;
   company: VehicleCompany;
   city: VehicleCity;
+}
+
+export interface VehicleUser {
+  user_id: number;
+  username: string;
+  role: string;
 }
 
 export interface VehicleItem {
@@ -55,10 +75,17 @@ export interface VehicleItem {
   vin_code: string | null;
   chassis: string | null;
   condition: VehicleCondition;
+  status?: ReviewStatus;
+  review_comment?: string | null;
   created_at: string;
+  reviewed_at?: string | null;
+
   model: VehicleModel;
   branch: VehicleBranch | null;
   photos: VehiclePhoto[];
+
+  creator?: VehicleUser;
+  reviewer?: VehicleUser | null;
 }
 
 export interface VehicleListResponse {

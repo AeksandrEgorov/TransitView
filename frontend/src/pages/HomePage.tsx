@@ -3,15 +3,15 @@ import { getVehicles } from "../config/vehicleApi";
 import { getCategories, getCities, getCounties } from "../config/referenceApi";
 import VehicleCard from "../components/home/VehicleCard";
 import VehicleFilters from "../components/home/VehicleFilters";
+import PageHero from "../components/ui/PageHero";
 import { useToast } from "../hooks/useToast";
+import { useDebounce } from "../hooks/useDebounce";
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
 import type {
   VehicleCondition,
   VehicleItem,
   VehicleListResponse,
 } from "../types/vehicle";
-import PageHero from "../components/ui/PageHero";
-
 
 function HomePage() {
   const { showToast } = useToast();
@@ -28,6 +28,7 @@ function HomePage() {
   const limit = 9;
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     null
@@ -110,7 +111,7 @@ function HomePage() {
         const data: VehicleListResponse = await getVehicles({
           page,
           limit,
-          regNumber: search || undefined,
+          regNumber: debouncedSearch || undefined,
 
           categoryId: selectedCategoryId ?? undefined,
           countyId: selectedCountyId ?? undefined,
@@ -140,7 +141,7 @@ function HomePage() {
   }, [
     page,
     limit,
-    search,
+    debouncedSearch,
     selectedCategoryId,
     selectedCountyId,
     selectedCityId,
@@ -153,7 +154,7 @@ function HomePage() {
   useEffect(() => {
     setPage(1);
   }, [
-    search,
+    debouncedSearch,
     selectedCategoryId,
     selectedCountyId,
     selectedCityId,
