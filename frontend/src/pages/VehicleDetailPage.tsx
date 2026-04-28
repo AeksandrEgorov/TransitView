@@ -8,6 +8,7 @@ import { useToast } from "../hooks/useToast";
 import type { VehicleItem, VehiclePhoto } from "../types/vehicle";
 import { formatVehicleCondition } from "../utils/formatters";
 import { getCloudinaryImageUrl } from "../utils/cloudinary";
+import StatusBadge from "../components/ui/StatusBadge";
 
 function formatDate(dateString?: string | null) {
   if (!dateString) {
@@ -36,19 +37,26 @@ function getPhotoDate(photo?: VehiclePhoto) {
 function InfoCard({
   label,
   value,
+  condition,
 }: {
   label: string;
   value: string | number | null | undefined;
+  condition?: VehicleItem["condition"];
 }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label}
       </p>
-
-      <p className="mt-1 text-sm font-semibold text-slate-800">
-        {value || "Teadmata"}
-      </p>
+      <div className="mt-1">
+        {label === "Seisund" && condition ? (
+          <StatusBadge condition={condition} />
+        ) : (
+          <p className="text-sm font-semibold text-slate-800">
+            {value || "Teadmata"}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -315,6 +323,7 @@ function VehicleDetailPage() {
             <InfoCard
               label="Seisund"
               value={formatVehicleCondition(vehicle.condition)}
+              condition={vehicle.condition}
             />
             <InfoCard label="Väljalaskeaasta" value={vehicle.vla_year} />
             <InfoCard label="Kategooria" value={vehicle.model.category.name} />
