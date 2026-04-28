@@ -186,7 +186,7 @@ export async function getPhotosByVehicleId(params: {
       skip,
       take: limit,
       orderBy: {
-        created_at: "desc",
+        created_at: "asc",
       },
       include: {
         author: {

@@ -70,7 +70,7 @@ const vehiclePublicInclude = {
       status: "Kinnitatud" as const,
     },
     orderBy: {
-      created_at: "desc" as const,
+      created_at: "asc" as const,
     },
     take: 1,
     include: {
@@ -393,7 +393,7 @@ export async function getVehicleById(vehicleId: number) {
           status: "Kinnitatud",
         },
         orderBy: {
-          created_at: "desc",
+          created_at: "asc",
         },
         take: 1,
         include: {
