@@ -99,6 +99,7 @@ export const vehicles = [
     modelName: "R440",
     vlaYear: 2010,
     vinCode: "XLER6X20005248380",
+    chassis: "Scania la6x2mnb",
     status: "Kinnitatud",
     condition: "Ei_tööta",
     createdByUsername: "user1",
