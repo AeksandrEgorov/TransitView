@@ -16,4 +16,6 @@ export interface UpdatePhotoBody {
   city_id?: number | null;
   place?: string | null;
   taken_at?: string | null;
+  file_path?: string;
+  cloudinary_public_id?: string | null;
 }

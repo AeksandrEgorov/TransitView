@@ -35,6 +35,8 @@ export const createPhotoSchema = z.object({
     .trim()
     .min(1, "file_path is required")
     .url("file_path must be a valid URL"),
+
+  cloudinary_public_id: z.string().trim().min(1).optional(),
 });
 
 export const updatePhotoSchema = z.object({
@@ -47,4 +49,8 @@ export const updatePhotoSchema = z.object({
   taken_at: z
     .union([z.string().datetime(), z.null()])
     .optional(),
+  
+  file_path: z.string().url().optional(),
+
+  cloudinary_public_id: z.string().trim().min(1).nullable().optional(),
 });

@@ -251,6 +251,7 @@ async function main() {
         place: photo.place ?? null,
         taken_at: photo.takenAt ? new Date(photo.takenAt) : null,
         file_path: photo.filePath,
+        cloudinary_public_id: photo.cloudinaryPublicId ?? null,
         status: photo.status as ReviewStatus,
         reviewed_at: photo.status === "Kinnitatud" ? new Date() : null,
         review_comment: photo.reviewComment ?? null,

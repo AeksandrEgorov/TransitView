@@ -23,6 +23,7 @@ interface CreatePhotoData {
   place?: string | null;
   taken_at?: string | null;
   file_path: string;
+  cloudinary_public_id?: string | null;
   user_id: number;
 }
 
@@ -268,6 +269,7 @@ export async function createPhoto(data: CreatePhotoData) {
       place: data.place ?? null,
       taken_at: data.taken_at ? new Date(data.taken_at) : null,
       file_path: data.file_path,
+      cloudinary_public_id: data.cloudinary_public_id ?? null,
       status: ReviewStatus.Ootel,
       review_comment: null,
     },
@@ -292,6 +294,10 @@ export async function updatePhoto(photoId: number, data: UpdatePhotoBody) {
       ...(data.place !== undefined ? { place: data.place } : {}),
       ...(data.taken_at !== undefined
         ? { taken_at: data.taken_at ? new Date(data.taken_at) : null }
+        : {}),
+      ...(data.file_path !== undefined ? { file_path: data.file_path } : {}),
+      ...(data.cloudinary_public_id !== undefined
+        ? { cloudinary_public_id: data.cloudinary_public_id }
         : {}),
     },
   });

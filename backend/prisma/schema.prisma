@@ -146,21 +146,22 @@ model Vehicles {
 }
 
 model Photos {
-  photo_id      Int           @id @default(autoincrement())
-  vehicle_id    Int
-  author_id     Int
-  city_id       Int?
-  place         String?       @db.VarChar(200)
-  taken_at      DateTime?     @db.Timestamptz(6)
-  file_path     String        @db.Text
-  status        ReviewStatus
-  created_at    DateTime      @default(now()) @db.Timestamptz(6)
-  reviewed_at   DateTime?     @db.Timestamptz(6)
-  review_comment  String?     @db.Text
+  photo_id              Int           @id @default(autoincrement())
+  vehicle_id            Int
+  author_id             Int
+  city_id               Int?
+  place                 String?       @db.VarChar(200)
+  taken_at              DateTime?     @db.Timestamptz(6)
+  file_path             String        @db.Text
+  cloudinary_public_id  String?
+  status                ReviewStatus
+  created_at            DateTime      @default(now()) @db.Timestamptz(6)
+  reviewed_at           DateTime?     @db.Timestamptz(6)
+  review_comment        String?       @db.Text
 
-  vehicle       Vehicles      @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade, onUpdate: Cascade)
-  author        Users         @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
-  city          Cities?       @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
+  vehicle               Vehicles      @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade, onUpdate: Cascade)
+  author                Users         @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
+  city                  Cities?       @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
 
   @@schema("transitview")
 }

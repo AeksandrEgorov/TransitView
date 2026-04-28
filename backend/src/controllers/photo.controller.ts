@@ -248,6 +248,7 @@ export async function createPhotoHandler(
       place: body.place,
       taken_at: body.taken_at,
       file_path: body.file_path,
+      cloudinary_public_id: body.cloudinary_public_id,
       user_id: req.user.userId,
     });
 
