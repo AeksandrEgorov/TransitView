@@ -45,6 +45,7 @@ interface CreateVehicleWithFirstPhotoData {
   place: string;
   taken_at?: string | null;
   file_path: string;
+  cloudinary_public_id?: string | null;
 
   user_id: number;
 }
@@ -441,6 +442,7 @@ export async function createVehicleWithFirstPhoto(
         place: data.place,
         taken_at: data.taken_at ? new Date(data.taken_at) : null,
         file_path: data.file_path,
+        cloudinary_public_id: data.cloudinary_public_id ?? null,
         status: "Ootel",
         review_comment: null,
       },

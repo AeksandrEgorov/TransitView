@@ -32,3 +32,15 @@ export function uploadBufferToCloudinary(
     streamifier.createReadStream(fileBuffer).pipe(stream);
   });
 }
+
+export async function deleteCloudinaryImage(
+  publicId: string | null | undefined
+) {
+  if (!publicId) {
+    return;
+  }
+
+  await cloudinary.uploader.destroy(publicId, {
+    resource_type: "image",
+  });
+}

@@ -258,6 +258,7 @@ export async function createVehicleHandler(
       place,
       taken_at,
       file_path: uploadedImage.secure_url,
+      cloudinary_public_id: uploadedImage.public_id,
       user_id: req.user.userId,
     });
 

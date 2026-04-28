@@ -101,6 +101,7 @@ CREATE TABLE "Photos" (
     "place" VARCHAR(200),
     "taken_at" TIMESTAMPTZ(6),
     "file_path" TEXT NOT NULL,
+    "cloudinary_public_id" TEXT,
     "status" "ReviewStatus" NOT NULL,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "reviewed_at" TIMESTAMPTZ(6),
