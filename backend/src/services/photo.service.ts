@@ -15,7 +15,7 @@ interface GetMyPhotosParams {
   userId: number;
   page: number;
   limit: number;
-  status?: "Ootel" | "Tagasi_lukatud" | "Kinnitatud";
+  status?: ReviewStatus;
 }
 
 interface CreatePhotoData {

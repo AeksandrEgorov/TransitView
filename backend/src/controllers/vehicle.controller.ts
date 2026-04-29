@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
 import type { MyVehicleListQuery, VehicleListQuery } from "../types/vehicle.js";
+import { ReviewStatus } from "../generated/prisma/client.js";
 import {
   getPublicVehicles,
   getMyVehicles,
@@ -40,6 +41,20 @@ function parseDateQuery(
   }
 
   return date;
+}
+
+function parseReviewStatus(
+  value: string | undefined
+): ReviewStatus | undefined | null {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === ReviewStatus.Ootel) return ReviewStatus.Ootel;
+  if (value === ReviewStatus.Kinnitatud) return ReviewStatus.Kinnitatud;
+  if (value === ReviewStatus.Tagasi_lukatud) return ReviewStatus.Tagasi_lukatud;
+
+  return null;
 }
 
 export async function getVehicles(
@@ -116,14 +131,12 @@ export async function getMyVehiclesHandler(
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
-    if (
-      query.status &&
-      query.status !== "Ootel" &&
-      query.status !== "Tagasi_lukatud" &&
-      query.status !== "Kinnitatud"
-    ) {
+    const status = parseReviewStatus(query.status);
+
+    if (status === null) {
       res.status(400).json({
-        message: "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
+        message:
+          "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
       });
       return;
     }
@@ -132,7 +145,7 @@ export async function getMyVehiclesHandler(
       userId: req.user.userId,
       page,
       limit,
-      status: query.status,
+      status,
     });
 
     res.status(200).json(result);
@@ -313,7 +326,8 @@ export async function updateVehicleHandler(
 
     const ownerCanEdit =
       isOwner &&
-      (vehicle.status === "Ootel" || vehicle.status === "Tagasi_lukatud");
+      (vehicle.status === ReviewStatus.Ootel ||
+        vehicle.status === ReviewStatus.Tagasi_lukatud);
 
     if (!isHigherRole && !ownerCanEdit) {
       res.status(403).json({ message: "You cannot edit this vehicle" });
@@ -363,7 +377,8 @@ export async function deleteVehicleHandler(
 
     const ownerCanDelete =
       isOwner &&
-      (vehicle.status === "Ootel" || vehicle.status === "Tagasi_lukatud");
+      (vehicle.status === ReviewStatus.Ootel ||
+        vehicle.status === ReviewStatus.Tagasi_lukatud);
 
     if (!isHigherRole && !ownerCanDelete) {
       res.status(403).json({ message: "You cannot delete this vehicle" });

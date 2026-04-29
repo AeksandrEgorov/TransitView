@@ -1,6 +1,11 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
-import type { MyPhotoListQuery, PhotoListQuery, UpdatePhotoBody } from "../types/photo.js";
+import type {
+  MyPhotoListQuery,
+  PhotoListQuery,
+  UpdatePhotoBody,
+} from "../types/photo.js";
+import { ReviewStatus } from "../generated/prisma/client.js";
 import {
   getPublicPhotos,
   getPhotoById,
@@ -22,6 +27,20 @@ import {
   updatePhotoSchema,
 } from "../validators/photo.validator.js";
 import { rejectSchema } from "../validators/moderation.validator.js";
+
+function parseReviewStatus(
+  value: string | undefined
+): ReviewStatus | undefined | null {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === ReviewStatus.Ootel) return ReviewStatus.Ootel;
+  if (value === ReviewStatus.Kinnitatud) return ReviewStatus.Kinnitatud;
+  if (value === ReviewStatus.Tagasi_lukatud) return ReviewStatus.Tagasi_lukatud;
+
+  return null;
+}
 
 export async function uploadPhotoHandler(
   req: AuthRequest,
@@ -138,14 +157,12 @@ export async function getMyPhotosHandler(
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
 
-    if (
-      query.status &&
-      query.status !== "Ootel" &&
-      query.status !== "Tagasi_lukatud" &&
-      query.status !== "Kinnitatud"
-    ) {
+    const status = parseReviewStatus(query.status);
+
+    if (status === null) {
       res.status(400).json({
-        message: "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
+        message:
+          "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
       });
       return;
     }
@@ -154,7 +171,7 @@ export async function getMyPhotosHandler(
       userId: req.user.userId,
       page,
       limit,
-      status: query.status,
+      status,
     });
 
     res.status(200).json(result);
@@ -305,7 +322,8 @@ export async function updatePhotoHandler(
 
     const ownerCanEdit =
       isOwner &&
-      (photo.status === "Ootel" || photo.status === "Tagasi_lukatud");
+      (photo.status === ReviewStatus.Ootel ||
+        photo.status === ReviewStatus.Tagasi_lukatud);
 
     if (!isHigherRole && !ownerCanEdit) {
       res.status(403).json({ message: "You cannot edit this photo" });
@@ -313,6 +331,11 @@ export async function updatePhotoHandler(
     }
 
     const updatedPhoto = await updatePhoto(photoId, body);
+
+    if (!updatedPhoto) {
+      res.status(404).json({ message: "Photo not found" });
+      return;
+    }
 
     res.status(200).json({
       message: "Photo updated successfully",
@@ -355,14 +378,20 @@ export async function deletePhotoHandler(
 
     const ownerCanDelete =
       isOwner &&
-      (photo.status === "Ootel" || photo.status === "Tagasi_lukatud");
+      (photo.status === ReviewStatus.Ootel ||
+        photo.status === ReviewStatus.Tagasi_lukatud);
 
     if (!isHigherRole && !ownerCanDelete) {
       res.status(403).json({ message: "You cannot delete this photo" });
       return;
     }
 
-    await deletePhoto(photoId);
+    const deletedPhoto = await deletePhoto(photoId);
+
+    if (!deletedPhoto) {
+      res.status(404).json({ message: "Photo not found" });
+      return;
+    }
 
     res.status(200).json({
       message: "Photo deleted successfully",

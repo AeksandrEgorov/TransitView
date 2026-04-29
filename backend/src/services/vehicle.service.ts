@@ -1,6 +1,6 @@
 import prisma from "../config/prisma.js";
+import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
 import type { UpdateVehicleBody } from "../types/vehicle.js";
-import { ReviewStatus } from "../generated/prisma/client.js";
 
 interface GetPublicVehiclesParams {
   page: number;
@@ -24,7 +24,7 @@ interface GetMyVehiclesParams {
   userId: number;
   page: number;
   limit: number;
-  status?: "Ootel" | "Tagasi_lukatud" | "Kinnitatud";
+  status?: ReviewStatus;
 }
 
 interface CreateVehicleWithFirstPhotoData {
@@ -68,7 +68,7 @@ const vehiclePublicInclude = {
   },
   photos: {
     where: {
-      status: "Kinnitatud" as const,
+      status: ReviewStatus.Kinnitatud,
     },
     orderBy: {
       created_at: "asc" as const,
@@ -111,14 +111,10 @@ const vehicleDashboardInclude = {
     select: {
       user_id: true,
       username: true,
+      role: true,
     },
   },
   photos: {
-    where: {
-      status: {
-        in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
-      },
-    },
     orderBy: {
       created_at: "asc" as const,
     },
@@ -178,7 +174,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
             {
               photos: {
                 some: {
-                  status: "Kinnitatud" as const,
+                  status: ReviewStatus.Kinnitatud,
                   ...(cityId ? { city_id: cityId } : {}),
                   ...(countyId
                     ? {
@@ -195,7 +191,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
       : {};
 
   const where = {
-    status: "Kinnitatud" as const,
+    status: ReviewStatus.Kinnitatud,
 
     ...(regNumber
       ? {
@@ -217,7 +213,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
         }
       : {}),
 
-    ...(condition ? { condition: condition as any } : {}),
+    ...(condition ? { condition: condition as VehicleCondition } : {}),
     ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
 
     ...(categoryId
@@ -326,11 +322,6 @@ export async function getMyVehicleById(vehicleId: number, userId: number) {
         },
       },
       photos: {
-        where: {
-          status: {
-            in: [ReviewStatus.Ootel, ReviewStatus.Tagasi_lukatud],
-          },
-        },
         orderBy: {
           created_at: "asc",
         },
@@ -357,7 +348,7 @@ export async function getVehicleById(vehicleId: number) {
   return prisma.vehicles.findFirst({
     where: {
       vehicle_id: vehicleId,
-      status: "Kinnitatud",
+      status: ReviewStatus.Kinnitatud,
     },
     include: {
       model: {
@@ -391,7 +382,7 @@ export async function getVehicleById(vehicleId: number) {
       },
       photos: {
         where: {
-          status: "Kinnitatud",
+          status: ReviewStatus.Kinnitatud,
         },
         orderBy: {
           created_at: "asc",
@@ -428,7 +419,7 @@ export async function createVehicleWithFirstPhoto(
         vin_code: data.vin_code ?? null,
         chassis: data.chassis ?? null,
         condition: data.condition ?? "Teadmata",
-        status: "Ootel",
+        status: ReviewStatus.Ootel,
         created_by: data.user_id,
         review_comment: null,
       },
@@ -443,7 +434,7 @@ export async function createVehicleWithFirstPhoto(
         taken_at: data.taken_at ? new Date(data.taken_at) : null,
         file_path: data.file_path,
         cloudinary_public_id: data.cloudinary_public_id ?? null,
-        status: "Ootel",
+        status: ReviewStatus.Ootel,
         review_comment: null,
       },
     });
@@ -493,7 +484,7 @@ export async function getPendingVehicles(params: {
   const skip = (page - 1) * limit;
 
   const where = {
-    status: "Ootel" as const,
+    status: ReviewStatus.Ootel,
   };
 
   const [items, total] = await Promise.all([
@@ -527,7 +518,7 @@ export async function approveVehicle(vehicleId: number, reviewerId: number) {
         vehicle_id: vehicleId,
       },
       data: {
-        status: "Kinnitatud",
+        status: ReviewStatus.Kinnitatud,
         reviewed_by: reviewerId,
         reviewed_at: new Date(),
         review_comment: null,
@@ -549,7 +540,7 @@ export async function approveVehicle(vehicleId: number, reviewerId: number) {
           photo_id: firstPhoto.photo_id,
         },
         data: {
-          status: "Kinnitatud",
+          status: ReviewStatus.Kinnitatud,
           reviewed_at: new Date(),
           review_comment: null,
         },
@@ -571,7 +562,7 @@ export async function rejectVehicle(
         vehicle_id: vehicleId,
       },
       data: {
-        status: "Tagasi_lukatud",
+        status: ReviewStatus.Tagasi_lukatud,
         reviewed_by: reviewerId,
         reviewed_at: new Date(),
         review_comment: reviewComment,
@@ -593,7 +584,7 @@ export async function rejectVehicle(
           photo_id: firstPhoto.photo_id,
         },
         data: {
-          status: "Tagasi_lukatud",
+          status: ReviewStatus.Tagasi_lukatud,
           reviewed_at: new Date(),
           review_comment: reviewComment,
         },
