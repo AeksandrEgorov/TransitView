@@ -1,14 +1,24 @@
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CalendarDays, Camera, MapPin, User } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Camera,
+  MapPin,
+  Plus,
+  User,
+} from "lucide-react";
 import { getVehicleById } from "../config/vehicleApi";
 import { getPhotosByVehicleId } from "../config/photoApi";
+import { getCities } from "../config/referenceApi";
 import PageHero from "../components/ui/PageHero";
+import AddPhotoModal from "../components/modals/AddPhotoModal";
 import { useToast } from "../hooks/useToast";
+import { useAuth } from "../hooks/useAuth";
+import type { CityItem } from "../types/reference";
 import type { VehicleItem, VehiclePhoto } from "../types/vehicle";
 import { formatVehicleCondition } from "../utils/formatters";
 import { getCloudinaryImageUrl } from "../utils/cloudinary";
-import StatusBadge from "../components/ui/StatusBadge";
 
 function formatDate(dateString?: string | null) {
   if (!dateString) {
@@ -34,29 +44,80 @@ function getPhotoDate(photo?: VehiclePhoto) {
   return formatDate(photo.taken_at);
 }
 
+function getConditionCardClass(condition: VehicleItem["condition"]) {
+  if (condition === "Töökorras") {
+    return "bg-emerald-50 ring-emerald-200";
+  }
+
+  if (condition === "Ei_tööta") {
+    return "bg-amber-50 ring-amber-200";
+  }
+
+  if (condition === "Maha_kantud") {
+    return "bg-rose-50 ring-rose-200";
+  }
+
+  if (condition === "Müüdud") {
+    return "bg-violet-50 ring-violet-200";
+  }
+
+  return "bg-slate-100 ring-slate-200";
+}
+
+function getConditionTextClass(condition: VehicleItem["condition"]) {
+  if (condition === "Töökorras") {
+    return "text-emerald-700";
+  }
+
+  if (condition === "Ei_tööta") {
+    return "text-amber-700";
+  }
+
+  if (condition === "Maha_kantud") {
+    return "text-rose-700";
+  }
+
+  if (condition === "Müüdud") {
+    return "text-violet-700";
+  }
+
+  return "text-slate-700";
+}
+
 function InfoCard({
   label,
   value,
-  condition,
 }: {
   label: string;
   value: string | number | null | undefined;
-  condition?: VehicleItem["condition"];
 }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label}
       </p>
-      <div className="mt-1">
-        {label === "Seisund" && condition ? (
-          <StatusBadge condition={condition} />
-        ) : (
-          <p className="text-sm font-semibold text-slate-800">
-            {value || "Teadmata"}
-          </p>
-        )}
-      </div>
+
+      <p className="mt-1 text-sm font-semibold text-slate-800">
+        {value || "Teadmata"}
+      </p>
+    </div>
+  );
+}
+
+function ConditionInfoCard({ condition }: { condition: VehicleItem["condition"] }) {
+  return (
+    <div
+      className={`rounded-2xl px-4 py-3 ring-1 ${getConditionCardClass(
+        condition
+      )}`}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        Seisund
+      </p>
+
+      <p className={`mt-1 text-sm font-bold ${getConditionTextClass(condition)}`}>
+        {formatVehicleCondition(condition)}
+      </p>
     </div>
   );
 }
@@ -64,9 +125,11 @@ function InfoCard({
 function VehicleDetailPage() {
   const { id } = useParams();
   const { showToast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
   const [vehicle, setVehicle] = useState<VehicleItem | null>(null);
   const [vehiclePhotos, setVehiclePhotos] = useState<VehiclePhoto[]>([]);
+  const [cities, setCities] = useState<CityItem[]>([]);
 
   const [isVehicleLoading, setIsVehicleLoading] = useState(true);
   const [isPhotosLoading, setIsPhotosLoading] = useState(true);
@@ -75,72 +138,103 @@ function VehicleDetailPage() {
   const [photoTotalPages, setPhotoTotalPages] = useState(1);
   const [photoTotal, setPhotoTotal] = useState(0);
 
+  const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
+
   const photosLimit = 12;
   const photosRef = useRef<HTMLDivElement | null>(null);
 
   const vehicleId = Number(id);
 
-  useEffect(() => {
-    async function loadVehicle() {
-      if (Number.isNaN(vehicleId)) {
-        setIsVehicleLoading(false);
-        return;
-      }
+  const canAddPhoto =
+    isAuthenticated &&
+    !!vehicle &&
+    !!user &&
+    (vehicle.creator?.user_id === user.user_id ||
+      user.role === "Andmebaasi_toimetaja" ||
+      user.role === "Administraator");
 
-      try {
-        setIsVehicleLoading(true);
-
-        const data = await getVehicleById(vehicleId);
-        setVehicle(data);
-      } catch (error) {
-        console.error(error);
-
-        showToast({
-          variant: "error",
-          title: "Sõiduki laadimine ebaõnnestus",
-          message: "Sõiduki andmeid ei õnnestunud laadida.",
-        });
-      } finally {
-        setIsVehicleLoading(false);
-      }
+  const loadVehicle = useCallback(async () => {
+    if (Number.isNaN(vehicleId)) {
+      setIsVehicleLoading(false);
+      return;
     }
 
-    loadVehicle();
+    try {
+      setIsVehicleLoading(true);
+
+      const data = await getVehicleById(vehicleId);
+      setVehicle(data);
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Sõiduki laadimine ebaõnnestus",
+        message: "Sõiduki andmeid ei õnnestunud laadida.",
+      });
+    } finally {
+      setIsVehicleLoading(false);
+    }
   }, [vehicleId, showToast]);
 
+  const loadPhotos = useCallback(async () => {
+    if (Number.isNaN(vehicleId)) {
+      setIsPhotosLoading(false);
+      return;
+    }
+
+    try {
+      setIsPhotosLoading(true);
+
+      const data = await getPhotosByVehicleId(vehicleId, {
+        page: photoPage,
+        limit: photosLimit,
+      });
+
+      setVehiclePhotos(data.items);
+      setPhotoTotalPages(data.meta.totalPages);
+      setPhotoTotal(data.meta.total);
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Fotode laadimine ebaõnnestus",
+        message: "Sõiduki fotosid ei õnnestunud laadida.",
+      });
+    } finally {
+      setIsPhotosLoading(false);
+    }
+  }, [vehicleId, photoPage, showToast]);
+
   useEffect(() => {
-    async function loadPhotos() {
-      if (Number.isNaN(vehicleId)) {
-        setIsPhotosLoading(false);
-        return;
-      }
+    loadVehicle();
+  }, [loadVehicle]);
 
+  useEffect(() => {
+    loadPhotos();
+  }, [loadPhotos]);
+
+  useEffect(() => {
+    async function loadCities() {
       try {
-        setIsPhotosLoading(true);
-
-        const data = await getPhotosByVehicleId(vehicleId, {
-          page: photoPage,
-          limit: photosLimit,
-        });
-
-        setVehiclePhotos(data.items);
-        setPhotoTotalPages(data.meta.totalPages);
-        setPhotoTotal(data.meta.total);
+        const data = await getCities();
+        setCities(data);
       } catch (error) {
         console.error(error);
 
         showToast({
           variant: "error",
-          title: "Fotode laadimine ebaõnnestus",
-          message: "Sõiduki fotosid ei õnnestunud laadida.",
+          title: "Linnade laadimine ebaõnnestus",
+          message: "Foto lisamise vormi jaoks ei õnnestunud linnu laadida.",
         });
-      } finally {
-        setIsPhotosLoading(false);
       }
     }
 
-    loadPhotos();
-  }, [vehicleId, photoPage, showToast]);
+    if (isAuthenticated) {
+      loadCities();
+    }
+  }, [isAuthenticated, showToast]);
 
   const mainPhoto = vehiclePhotos[0] ?? vehicle?.photos[0];
 
@@ -165,6 +259,14 @@ function VehicleDetailPage() {
         block: "start",
       });
     }, 100);
+  }
+
+  function handlePhotoCreated() {
+    if (photoPage === 1) {
+      loadPhotos();
+    } else {
+      setPhotoPage(1);
+    }
   }
 
   if (Number.isNaN(vehicleId)) {
@@ -233,7 +335,7 @@ function VehicleDetailPage() {
         description={`Registrinumber ${vehicle.reg_number}. Siin on avalik ülevaade sõiduki andmetest ja sellega seotud kinnitatud fotodest.`}
       />
 
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/"
           className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -241,6 +343,17 @@ function VehicleDetailPage() {
           <ArrowLeft className="h-4 w-4" />
           Tagasi avalehele
         </Link>
+
+        {canAddPhoto && (
+          <button
+            type="button"
+            onClick={() => setIsAddPhotoModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Lisa foto
+          </button>
+        )}
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -320,11 +433,7 @@ function VehicleDetailPage() {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <InfoCard label="Registrinumber" value={vehicle.reg_number} />
-            <InfoCard
-              label="Seisund"
-              value={formatVehicleCondition(vehicle.condition)}
-              condition={vehicle.condition}
-            />
+            <ConditionInfoCard condition={vehicle.condition} />
             <InfoCard label="Väljalaskeaasta" value={vehicle.vla_year} />
             <InfoCard label="Kategooria" value={vehicle.model.category.name} />
             <InfoCard label="Tootja" value={vehicle.model.manufacturer} />
@@ -368,7 +477,8 @@ function VehicleDetailPage() {
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Siin kuvatakse selle sõidukiga seotud kinnitatud fotod.
+            Siin kuvatakse selle sõidukiga seotud kinnitatud fotod. Kui fotosid
+            on palju, saab nende vahel liikuda lehekülgede kaupa.
           </p>
         </div>
 
@@ -504,6 +614,14 @@ function VehicleDetailPage() {
           </div>
         )}
       </section>
+
+      <AddPhotoModal
+        isOpen={isAddPhotoModalOpen}
+        vehicleId={vehicle.vehicle_id}
+        cities={cities}
+        onClose={() => setIsAddPhotoModalOpen(false)}
+        onSuccess={handlePhotoCreated}
+      />
     </div>
   );
 }

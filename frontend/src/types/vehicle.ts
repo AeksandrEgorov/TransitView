@@ -31,6 +31,7 @@ export interface VehiclePhoto {
   place?: string | null;
   taken_at?: string | null;
   file_path: string;
+  cloudinary_public_id?: string | null;
   status?: ReviewStatus;
   review_comment?: string | null;
   created_at: string;
