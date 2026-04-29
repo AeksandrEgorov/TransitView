@@ -90,5 +90,22 @@ export const GALLERY_RULES: Rule[] = [
     NB! Kui tekkivad küsimused või probleemid, siis te võite pöörata kas administraatorile või moderaatorile (vt. "Kontaktid")
     `,
     variant: "info"
+  },
+  {
+    id: 7,
+    title: "Kasutajakonto taotlemine",
+    description: `
+    Süsteemiga liitumiseks tuleb esitada ametlik taotlus.
+    1. Taotluse esitamine
+    1.1. Täida vorm oma täisnime, korrektse e-posti aadressi ja põhjendusega, miks soovid TransitView keskkonnaga liituda.
+    1.1.1. Vormi saab leida "Kontaktid" lehes.
+    2. Manuaalne kontroll
+    2.1. Administraator vaatab iga taotluse käsitsi läbi 3 päeva jooksul.
+    3. Konto loomine
+    3.1. Pärast taotluse heakskiitmist loob administraator teile konto rolliga 'Kasutaja'. Teile saadetakse sellekohane teavitus e-postile.
+    4. Lisainfo
+    4.1. Väljal 'Lisainfo' kirjelda lühidalt oma huvi ühistranspordi vastu või varasemat kogemust sarnastes projektides.
+    `,
+    variant: "info"
   }
 ];
