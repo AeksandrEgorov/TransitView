@@ -1,9 +1,16 @@
+import type { VehicleCondition } from "../generated/prisma/client.js";
+
 export interface PhotoListQuery {
   page?: string;
   limit?: string;
   cityId?: string;
   countyId?: string;
   vehicleId?: string;
+  regNumber?: string;
+  categoryId?: string;
+  condition?: VehicleCondition | "";
+  createdFrom?: string;
+  createdTo?: string;
 }
 
 export interface MyPhotoListQuery {

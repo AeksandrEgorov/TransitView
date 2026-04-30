@@ -1,5 +1,8 @@
 import prisma from "../config/prisma.js";
-import { ReviewStatus } from "../generated/prisma/client.js";
+import {
+  ReviewStatus,
+  type VehicleCondition,
+} from "../generated/prisma/client.js";
 import type { UpdatePhotoBody } from "../types/photo.js";
 import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 
@@ -9,6 +12,11 @@ interface GetPublicPhotosParams {
   cityId?: number;
   countyId?: number;
   vehicleId?: number;
+  regNumber?: string;
+  categoryId?: number;
+  condition?: VehicleCondition;
+  createdFrom?: Date;
+  createdTo?: Date;
 }
 
 interface GetMyPhotosParams {
@@ -103,8 +111,28 @@ const photoDashboardInclude = {
 };
 
 export async function getPublicPhotos(params: GetPublicPhotosParams) {
-  const { page, limit, cityId, countyId, vehicleId } = params;
+  const {
+    page,
+    limit,
+    cityId,
+    countyId,
+    vehicleId,
+    regNumber,
+    categoryId,
+    condition,
+    createdFrom,
+    createdTo,
+  } = params;
+
   const skip = (page - 1) * limit;
+
+  const createdAtWhere =
+    createdFrom || createdTo
+      ? {
+          ...(createdFrom ? { gte: createdFrom } : {}),
+          ...(createdTo ? { lte: createdTo } : {}),
+        }
+      : undefined;
 
   const locationFilter =
     cityId || countyId
@@ -120,13 +148,32 @@ export async function getPublicPhotos(params: GetPublicPhotosParams) {
         }
       : {};
 
+  const vehicleFilter = {
+    status: ReviewStatus.Kinnitatud,
+    ...(regNumber
+      ? {
+          reg_number: {
+            contains: regNumber,
+            mode: "insensitive" as const,
+          },
+        }
+      : {}),
+    ...(condition ? { condition } : {}),
+    ...(categoryId
+      ? {
+          model: {
+            category_id: categoryId,
+          },
+        }
+      : {}),
+  };
+
   const where = {
     status: ReviewStatus.Kinnitatud,
     ...(vehicleId ? { vehicle_id: vehicleId } : {}),
     ...locationFilter,
-    vehicle: {
-      status: ReviewStatus.Kinnitatud,
-    },
+    ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
+    vehicle: vehicleFilter,
   };
 
   const [items, total] = await Promise.all([
@@ -172,6 +219,7 @@ export async function getPhotosByVehicleId(params: {
   limit: number;
 }) {
   const { vehicleId, page, limit } = params;
+
   const skip = (page - 1) * limit;
 
   const where = {
@@ -220,6 +268,7 @@ export async function getPhotosByVehicleId(params: {
 
 export async function getMyPhotos(params: GetMyPhotosParams) {
   const { userId, page, limit, status } = params;
+
   const skip = (page - 1) * limit;
 
   const where = {
@@ -362,6 +411,7 @@ export async function getPendingPhotos(params: {
   limit: number;
 }) {
   const { page, limit } = params;
+
   const skip = (page - 1) * limit;
 
   const where = {
