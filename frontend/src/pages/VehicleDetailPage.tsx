@@ -13,6 +13,7 @@ import { getPhotosByVehicleId } from "../config/photoApi";
 import { getCities } from "../config/referenceApi";
 import PageHero from "../components/ui/PageHero";
 import AddPhotoModal from "../components/modals/AddPhotoModal";
+import PhotoPreviewModal from "../components/modals/PhotoPreviewModal";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import type { CityItem } from "../types/reference";
@@ -104,7 +105,11 @@ function InfoCard({
   );
 }
 
-function ConditionInfoCard({ condition }: { condition: VehicleItem["condition"] }) {
+function ConditionInfoCard({
+  condition,
+}: {
+  condition: VehicleItem["condition"];
+}) {
   return (
     <div
       className={`rounded-2xl px-4 py-3 ring-1 ${getConditionCardClass(
@@ -115,7 +120,11 @@ function ConditionInfoCard({ condition }: { condition: VehicleItem["condition"] 
         Seisund
       </p>
 
-      <p className={`mt-1 text-sm font-bold ${getConditionTextClass(condition)}`}>
+      <p
+        className={`mt-1 text-sm font-bold ${getConditionTextClass(
+          condition
+        )}`}
+      >
         {formatVehicleCondition(condition)}
       </p>
     </div>
@@ -130,6 +139,7 @@ function VehicleDetailPage() {
   const [vehicle, setVehicle] = useState<VehicleItem | null>(null);
   const [vehiclePhotos, setVehiclePhotos] = useState<VehiclePhoto[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<VehiclePhoto | null>(null);
 
   const [isVehicleLoading, setIsVehicleLoading] = useState(true);
   const [isPhotosLoading, setIsPhotosLoading] = useState(true);
@@ -152,6 +162,12 @@ function VehicleDetailPage() {
     (vehicle.creator?.user_id === user.user_id ||
       user.role === "Andmebaasi_toimetaja" ||
       user.role === "Administraator");
+
+  const selectedPhotoIndex = selectedPhoto
+    ? vehiclePhotos.findIndex(
+        (photo) => photo.photo_id === selectedPhoto.photo_id
+      )
+    : -1;
 
   const loadVehicle = useCallback(async () => {
     if (Number.isNaN(vehicleId)) {
@@ -194,6 +210,18 @@ function VehicleDetailPage() {
       setVehiclePhotos(data.items);
       setPhotoTotalPages(data.meta.totalPages);
       setPhotoTotal(data.meta.total);
+
+      setSelectedPhoto((currentPhoto) => {
+        if (!currentPhoto) {
+          return null;
+        }
+
+        const stillExists = data.items.find(
+          (photo) => photo.photo_id === currentPhoto.photo_id
+        );
+
+        return stillExists ?? null;
+      });
     } catch (error) {
       console.error(error);
 
@@ -251,6 +279,7 @@ function VehicleDetailPage() {
       return;
     }
 
+    setSelectedPhoto(null);
     setPhotoPage(newPage);
 
     window.setTimeout(() => {
@@ -259,6 +288,36 @@ function VehicleDetailPage() {
         block: "start",
       });
     }, 100);
+  }
+
+  function handlePreviousPhoto() {
+    if (!selectedPhoto || vehiclePhotos.length <= 1) {
+      return;
+    }
+
+    const currentIndex = vehiclePhotos.findIndex(
+      (photo) => photo.photo_id === selectedPhoto.photo_id
+    );
+
+    const previousIndex =
+      currentIndex <= 0 ? vehiclePhotos.length - 1 : currentIndex - 1;
+
+    setSelectedPhoto(vehiclePhotos[previousIndex]);
+  }
+
+  function handleNextPhoto() {
+    if (!selectedPhoto || vehiclePhotos.length <= 1) {
+      return;
+    }
+
+    const currentIndex = vehiclePhotos.findIndex(
+      (photo) => photo.photo_id === selectedPhoto.photo_id
+    );
+
+    const nextIndex =
+      currentIndex >= vehiclePhotos.length - 1 ? 0 : currentIndex + 1;
+
+    setSelectedPhoto(vehiclePhotos[nextIndex]);
   }
 
   function handlePhotoCreated() {
@@ -508,9 +567,11 @@ function VehicleDetailPage() {
                 );
 
                 return (
-                  <article
+                  <button
                     key={photo.photo_id}
-                    className="group overflow-hidden rounded-3xl bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(15,23,42,0.1)]"
+                    type="button"
+                    onClick={() => setSelectedPhoto(photo)}
+                    className="group overflow-hidden rounded-3xl bg-white text-left shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(15,23,42,0.1)]"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-slate-200">
                       <img
@@ -560,7 +621,7 @@ function VehicleDetailPage() {
                         </div>
                       )}
                     </div>
-                  </article>
+                  </button>
                 );
               })}
             </div>
@@ -621,6 +682,17 @@ function VehicleDetailPage() {
         cities={cities}
         onClose={() => setIsAddPhotoModalOpen(false)}
         onSuccess={handlePhotoCreated}
+      />
+
+      <PhotoPreviewModal
+        isOpen={selectedPhoto !== null}
+        photo={selectedPhoto}
+        vehicle={vehicle}
+        photos={vehiclePhotos}
+        currentIndex={selectedPhotoIndex >= 0 ? selectedPhotoIndex : 0}
+        onClose={() => setSelectedPhoto(null)}
+        onPrevious={handlePreviousPhoto}
+        onNext={handleNextPhoto}
       />
     </div>
   );
