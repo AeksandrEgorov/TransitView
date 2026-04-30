@@ -5,7 +5,10 @@ import type {
   PhotoListQuery,
   UpdatePhotoBody,
 } from "../types/photo.js";
-import { ReviewStatus } from "../generated/prisma/client.js";
+import {
+  ReviewStatus,
+  VehicleCondition,
+} from "../generated/prisma/client.js";
 import {
   getPublicPhotos,
   getPhotoById,
@@ -28,6 +31,27 @@ import {
 } from "../validators/photo.validator.js";
 import { rejectSchema } from "../validators/moderation.validator.js";
 
+function parseDateQuery(
+  value: string | undefined,
+  endOfDay = false
+): Date | null | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+  const date = isDateOnly
+    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
 function parseReviewStatus(
   value: string | undefined
 ): ReviewStatus | undefined | null {
@@ -37,7 +61,23 @@ function parseReviewStatus(
 
   if (value === ReviewStatus.Ootel) return ReviewStatus.Ootel;
   if (value === ReviewStatus.Kinnitatud) return ReviewStatus.Kinnitatud;
-  if (value === ReviewStatus.Tagasi_lukatud) return ReviewStatus.Tagasi_lukatud;
+  if (value === ReviewStatus.Tagasi_lukatud) {
+    return ReviewStatus.Tagasi_lukatud;
+  }
+
+  return null;
+}
+
+function parseVehicleCondition(
+  value: string | undefined
+): VehicleCondition | undefined | null {
+  if (!value) {
+    return undefined;
+  }
+
+  if (Object.values(VehicleCondition).includes(value as VehicleCondition)) {
+    return value as VehicleCondition;
+  }
 
   return null;
 }
@@ -71,8 +111,42 @@ export async function getPhotosHandler(
 ): Promise<void> {
   try {
     const query = req.query as PhotoListQuery;
+
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
+
+    const createdFrom = parseDateQuery(query.createdFrom);
+    const createdTo = parseDateQuery(query.createdTo, true);
+    const condition = parseVehicleCondition(query.condition);
+
+    if (createdFrom === null) {
+      res.status(400).json({
+        message: "Invalid createdFrom date format",
+      });
+      return;
+    }
+
+    if (createdTo === null) {
+      res.status(400).json({
+        message: "Invalid createdTo date format",
+      });
+      return;
+    }
+
+    if (createdFrom && createdTo && createdFrom > createdTo) {
+      res.status(400).json({
+        message: "createdFrom cannot be later than createdTo",
+      });
+      return;
+    }
+
+    if (condition === null) {
+      res.status(400).json({
+        message:
+          "Invalid condition. Allowed values: Töökorras, Ei_tööta, Maha_kantud, Müüdud, Teadmata",
+      });
+      return;
+    }
 
     const result = await getPublicPhotos({
       page,
@@ -80,6 +154,11 @@ export async function getPhotosHandler(
       cityId: query.cityId ? Number(query.cityId) : undefined,
       countyId: query.countyId ? Number(query.countyId) : undefined,
       vehicleId: query.vehicleId ? Number(query.vehicleId) : undefined,
+      regNumber: query.regNumber?.trim() || undefined,
+      categoryId: query.categoryId ? Number(query.categoryId) : undefined,
+      condition,
+      createdFrom,
+      createdTo,
     });
 
     res.status(200).json(result);
@@ -161,8 +240,7 @@ export async function getMyPhotosHandler(
 
     if (status === null) {
       res.status(400).json({
-        message:
-          "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
+        message: "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
       });
       return;
     }
