@@ -33,7 +33,7 @@ interface Props {
   onReset: () => void;
 }
 
-function VehicleFilters({
+function GalleryFilters({
   search,
   selectedCategoryId,
   selectedCountyId,
@@ -98,12 +98,12 @@ function VehicleFilters({
             </p>
 
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Leia sobiv sõiduk
+              Leia sobiv foto
             </h2>
 
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Filtreeri sõidukeid registrinumbri, kategooria, asukoha, seisundi
-              ja lisamise kuupäeva järgi.
+              Filtreeri fotosid sõiduki, kategooria, asukoha, seisundi ja
+              lisamise kuupäeva järgi.
             </p>
           </div>
 
@@ -143,7 +143,7 @@ function VehicleFilters({
               type="text"
               value={search}
               onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Näiteks 329 BRD"
+              placeholder="Näiteks 3014 KUK"
               className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
             />
           </div>
@@ -301,4 +301,4 @@ function VehicleFilters({
   );
 }
 
-export default VehicleFilters;
+export default GalleryFilters;

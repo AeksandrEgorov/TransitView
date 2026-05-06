@@ -1,14 +1,31 @@
 import api from "./axios";
-import type { VehiclePhoto } from "../types/vehicle";
+import type { VehicleCondition, VehiclePhoto } from "../types/vehicle";
 
-export interface VehiclePhotosResponse {
-  items: VehiclePhoto[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PhotosResponse<TPhoto = VehiclePhoto> {
+  items: TPhoto[];
+  meta: PaginationMeta;
+}
+
+export type VehiclePhotosResponse = PhotosResponse<VehiclePhoto>;
+
+export interface PublicPhotoQueryParams {
+  page?: number;
+  limit?: number;
+  cityId?: number;
+  countyId?: number;
+  vehicleId?: number;
+  regNumber?: string;
+  categoryId?: number;
+  condition?: VehicleCondition | "";
+  createdFrom?: string;
+  createdTo?: string;
 }
 
 interface UploadPhotoResponse {
@@ -31,13 +48,23 @@ interface CreatePhotoResponse {
   photo: VehiclePhoto;
 }
 
+export async function getPublicPhotos<TPhoto = VehiclePhoto>(
+  params: PublicPhotoQueryParams = {}
+): Promise<PhotosResponse<TPhoto>> {
+  const response = await api.get<PhotosResponse<TPhoto>>("/photos", {
+    params,
+  });
+
+  return response.data;
+}
+
 export async function getPhotosByVehicleId(
   vehicleId: number,
   params: {
     page: number;
     limit: number;
   }
-) {
+): Promise<VehiclePhotosResponse> {
   const response = await api.get<VehiclePhotosResponse>(
     `/photos/vehicle/${vehicleId}`,
     {
@@ -48,30 +75,24 @@ export async function getPhotosByVehicleId(
   return response.data;
 }
 
-export async function uploadPhotoFile(file: File, token: string) {
+export async function uploadPhotoFile(
+  file: File
+): Promise<UploadPhotoResponse> {
   const formData = new FormData();
   formData.append("image", file);
 
   const response = await api.post<UploadPhotoResponse>(
     "/photos/upload",
-    formData,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "multipart/form-data",
-      },
-    }
+    formData
   );
 
   return response.data;
 }
 
-export async function createPhoto(data: CreatePhotoRequest, token: string) {
-  const response = await api.post<CreatePhotoResponse>("/photos", data, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export async function createPhoto(
+  data: CreatePhotoRequest
+): Promise<CreatePhotoResponse> {
+  const response = await api.post<CreatePhotoResponse>("/photos", data);
 
   return response.data;
 }

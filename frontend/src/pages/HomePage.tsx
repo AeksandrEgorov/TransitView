@@ -25,6 +25,8 @@ function HomePage() {
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalVehicles, setTotalVehicles] = useState(0);
+
   const limit = 9;
 
   const [search, setSearch] = useState("");
@@ -112,18 +114,17 @@ function HomePage() {
           page,
           limit,
           regNumber: debouncedSearch || undefined,
-
           categoryId: selectedCategoryId ?? undefined,
           countyId: selectedCountyId ?? undefined,
           cityId: selectedCityId ?? undefined,
           condition: selectedCondition || undefined,
-
           createdFrom: createdFrom || undefined,
           createdTo: createdTo || undefined,
         });
 
         setVehicles(data.items);
-        setTotalPages(data.meta.totalPages);
+        setTotalPages(Math.max(data.meta.totalPages, 1));
+        setTotalVehicles(data.meta.total);
       } catch (error) {
         console.error(error);
 
@@ -203,9 +204,9 @@ function HomePage() {
   return (
     <div className="space-y-8">
       <PageHero
-        eyebrow="Avaleht"
-        title="Transpordiandmebaas"
-        description="Sirvi kinnitatud transpordikaarte, filtreeri tulemusi erinevate tingimuste järgi ja leia kiiresti just see sõiduk, mida otsid."
+        eyebrow="TransitView"
+        title="Transpordi andmebaas"
+        description="Sirvi kinnitatud transpordikaarte, filtreeri tulemusi ja ava detailvaade koos fotodega."
       />
 
       <VehicleFilters
@@ -244,6 +245,9 @@ function HomePage() {
           <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200">
             Leitud kaarte:{" "}
             <span className="font-bold text-slate-900">{vehicles.length}</span>
+            <span className="mx-2 text-slate-300">/</span>
+            Kokku:{" "}
+            <span className="font-bold text-slate-900">{totalVehicles}</span>
           </div>
         </div>
 

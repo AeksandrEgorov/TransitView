@@ -12,17 +12,14 @@ interface LoginResponse {
   user: AuthUser;
 }
 
-export async function login(data: LoginRequest) {
+export async function login(data: LoginRequest): Promise<LoginResponse> {
   const response = await api.post<LoginResponse>("/auth/login", data);
+
   return response.data;
 }
 
-export async function getMe(token: string) {
-  const response = await api.get<AuthUser>("/auth/me", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export async function getMe(): Promise<AuthUser> {
+  const response = await api.get<AuthUser>("/auth/me");
 
   return response.data;
 }

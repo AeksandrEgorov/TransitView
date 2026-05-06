@@ -1,26 +1,39 @@
+import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
-  BusFront,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Hash,
   ImageIcon,
   MapPin,
   User,
   X,
 } from "lucide-react";
+
 import Modal from "../ui/Modal";
 import type { VehicleItem, VehiclePhoto } from "../../types/vehicle";
-import { getCloudinaryImageUrl } from "../../utils/cloudinary";
+import {
+  fallbackToOriginalImage,
+  getCloudinaryImageUrl,
+} from "../../utils/cloudinary";
+
+type PreviewVehicle = Pick<VehicleItem, "vehicle_id" | "reg_number" | "model">;
+
+type PreviewPhoto = VehiclePhoto & {
+  vehicle?: PreviewVehicle | null;
+};
 
 interface Props {
   isOpen: boolean;
-  photo: VehiclePhoto | null;
-  vehicle: VehicleItem;
-  photos: VehiclePhoto[];
+  photo: PreviewPhoto | null;
+  vehicle?: PreviewVehicle | null;
+  photos: PreviewPhoto[];
   currentIndex: number;
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  showVehicleLink?: boolean;
 }
 
 function formatDate(dateString?: string | null) {
@@ -31,7 +44,7 @@ function formatDate(dateString?: string | null) {
   return new Date(dateString).toLocaleDateString("et-EE");
 }
 
-function getPhotoLocation(photo: VehiclePhoto) {
+function getPhotoLocation(photo: PreviewPhoto) {
   if (!photo.city) {
     return "Asukoht teadmata";
   }
@@ -39,29 +52,41 @@ function getPhotoLocation(photo: VehiclePhoto) {
   return `${photo.city.name}, ${photo.city.county.name}`;
 }
 
-function PhotoInfoItem({
+function getVehicleTitle(vehicle?: PreviewVehicle | null) {
+  if (!vehicle) {
+    return "Sõiduk teadmata";
+  }
+
+  return `${vehicle.model.manufacturer} ${vehicle.model.name}`;
+}
+
+function InfoItem({
   icon,
   label,
   value,
+  hideIfEmpty = false,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string | number | null | undefined;
+  hideIfEmpty?: boolean;
 }) {
+  if (hideIfEmpty && !value) {
+    return null;
+  }
+
   return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 shrink-0 text-blue-600">{icon}</div>
+    <div className="flex gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="mt-0.5 text-blue-600">{icon}</div>
 
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            {label}
-          </p>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+          {label}
+        </p>
 
-          <p className="mt-1 break-words text-sm font-semibold text-slate-800">
-            {value || "Teadmata"}
-          </p>
-        </div>
+        <p className="mt-1 break-words text-sm font-semibold text-slate-800">
+          {value || "Teadmata"}
+        </p>
       </div>
     </div>
   );
@@ -76,52 +101,46 @@ function PhotoPreviewModal({
   onClose,
   onPrevious,
   onNext,
+  showVehicleLink = false,
 }: Props) {
   if (!photo) {
     return null;
   }
 
+  const previewVehicle = vehicle ?? photo.vehicle ?? null;
+
   const imageUrl = getCloudinaryImageUrl(
     photo.file_path,
-    "w_1600,q_auto,f_auto"
+    "w_1400,q_auto,f_auto"
   );
 
   const hasMultiplePhotos = photos.length > 1;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" padded={false}>
-      <div className="max-h-[88vh] w-full max-w-[1180px] overflow-hidden rounded-[32px] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.32)]">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">
-              Foto detailid
-            </p>
+      <div
+        className="relative max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[28px] bg-white p-4 shadow-2xl sm:p-5 [&::-webkit-scrollbar]:hidden"
+        style={{
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-5 top-5 z-30 rounded-2xl bg-white/95 p-3 text-slate-500 shadow-lg ring-1 ring-slate-200 backdrop-blur transition hover:bg-slate-100 hover:text-slate-900"
+          aria-label="Sulge foto"
+        >
+          <X size={20} />
+        </button>
 
-            <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
-              {vehicle.reg_number}
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              {vehicle.model.manufacturer} {vehicle.model.name}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
-            aria-label="Sulge"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="grid max-h-[calc(88vh-88px)] overflow-y-auto lg:grid-cols-[1.55fr_0.65fr]">
-          <div className="relative flex min-h-[360px] items-center justify-center bg-slate-950 p-3 sm:min-h-[520px] sm:p-5">
+        <div className="grid gap-5 lg:h-[calc(100vh-170px)] lg:max-h-[620px] lg:min-h-[430px] lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="relative flex min-h-[300px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950 p-4 sm:min-h-[380px] lg:min-h-0">
             <img
               src={imageUrl}
-              alt={`${vehicle.reg_number} foto`}
-              className="max-h-[68vh] w-full rounded-2xl object-contain"
+              alt={previewVehicle?.reg_number ?? "TransitView foto"}
+              onError={(event) => fallbackToOriginalImage(event, photo.file_path)}
+              className="max-h-[54vh] w-full rounded-2xl object-contain lg:max-h-[540px]"
             />
 
             {hasMultiplePhotos && (
@@ -129,99 +148,98 @@ function PhotoPreviewModal({
                 <button
                   type="button"
                   onClick={onPrevious}
-                  className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg backdrop-blur transition hover:bg-white hover:scale-105"
+                  className="absolute left-4 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full bg-white/90 p-3 text-slate-900 shadow-lg transition hover:bg-white"
                   aria-label="Eelmine foto"
                 >
-                  <ChevronLeft className="h-6 w-6" />
+                  <ChevronLeft size={24} />
                 </button>
 
                 <button
                   type="button"
                   onClick={onNext}
-                  className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg backdrop-blur transition hover:bg-white hover:scale-105"
+                  className="absolute right-4 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full bg-white/90 p-3 text-slate-900 shadow-lg transition hover:bg-white"
                   aria-label="Järgmine foto"
                 >
-                  <ChevronRight className="h-6 w-6" />
+                  <ChevronRight size={24} />
                 </button>
 
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-xs font-bold text-slate-800 shadow-lg backdrop-blur">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-lg">
                   {currentIndex + 1} / {photos.length}
                 </div>
               </>
             )}
           </div>
 
-          <aside className="space-y-4 bg-white p-5 sm:p-6">
-            <div className="rounded-3xl bg-[#101a2d] p-5 text-white">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-300">
-                Foto info
+          <aside
+            className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-[24px] bg-white pr-1 [&::-webkit-scrollbar]:hidden"
+            style={{
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}
+          >
+            <div className="rounded-[22px] bg-slate-950 p-5 pr-14 text-white">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-300">
+                Foto detailid
               </p>
 
-              <h3 className="mt-2 text-xl font-extrabold">
-                {vehicle.reg_number}
+              <h3 className="mt-3 text-2xl font-bold">
+                {previewVehicle?.reg_number ?? "Reg. nr teadmata"}
               </h3>
 
-              <p className="mt-1 text-sm text-slate-300">
-                {vehicle.model.manufacturer} {vehicle.model.name}
+              <p className="mt-2 text-sm font-medium text-slate-300">
+                {getVehicleTitle(previewVehicle)}
               </p>
+
+              {previewVehicle && (
+                <p className="mt-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200 ring-1 ring-white/15">
+                  {previewVehicle.model.category.name}
+                </p>
+              )}
             </div>
 
-            <PhotoInfoItem
-              icon={<BusFront className="h-5 w-5" />}
-              label="Sõiduk"
-              value={`${vehicle.model.manufacturer} ${vehicle.model.name}`}
-            />
-
-            <PhotoInfoItem
-              icon={<MapPin className="h-5 w-5" />}
-              label="Asukoht"
-              value={getPhotoLocation(photo)}
-            />
-
-            <PhotoInfoItem
-              icon={<ImageIcon className="h-5 w-5" />}
-              label="Koht"
-              value={photo.place}
-            />
-
-            <PhotoInfoItem
-              icon={<CalendarDays className="h-5 w-5" />}
-              label="Pildistatud"
-              value={formatDate(photo.taken_at)}
-            />
-
-            <PhotoInfoItem
-              icon={<CalendarDays className="h-5 w-5" />}
-              label="Lisatud"
-              value={formatDate(photo.created_at)}
-            />
-
-            {photo.author && (
-              <PhotoInfoItem
-                icon={<User className="h-5 w-5" />}
-                label="Autor"
-                value={photo.author.username}
+            <div className="grid gap-3">
+              <InfoItem
+                icon={<Hash size={18} />}
+                label="Foto ID"
+                value={photo.photo_id}
               />
-            )}
 
-            {hasMultiplePhotos && (
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={onPrevious}
-                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-                >
-                  Eelmine
-                </button>
+              <InfoItem
+                icon={<MapPin size={18} />}
+                label="Asukoht"
+                value={getPhotoLocation(photo)}
+              />
 
-                <button
-                  type="button"
-                  onClick={onNext}
-                  className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-                >
-                  Järgmine
-                </button>
-              </div>
+              <InfoItem
+                icon={<ImageIcon size={18} />}
+                label="Koht"
+                value={photo.place}
+                hideIfEmpty
+              />
+
+              <InfoItem
+                icon={<CalendarDays size={18} />}
+                label="Lisatud"
+                value={formatDate(photo.created_at)}
+              />
+
+              {photo.author && (
+                <InfoItem
+                  icon={<User size={18} />}
+                  label="Autor"
+                  value={photo.author.username}
+                />
+              )}
+            </div>
+
+            {showVehicleLink && previewVehicle && (
+              <Link
+                to={`/vehicles/${previewVehicle.vehicle_id}`}
+                onClick={onClose}
+                className="mt-auto inline-flex w-full items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-700"
+              >
+                Vaata sõidukit
+              </Link>
             )}
           </aside>
         </div>
