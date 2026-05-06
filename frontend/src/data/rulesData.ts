@@ -20,7 +20,8 @@ export const GALLERY_RULES: Rule[] = [
     3.2. Kui sõiduk on mingite objektide varjus, kuid see ei häiri sõiduki nähtavust, teeb vastuvõtmise otsuse administraator.
     4. Fotol olevate autojuhtide ja teiste inimeste peavad olema ära varjatud, kuna me hoolime nii fotograafide kui ka teiste inimeste turvalisusest.
     4.1. Näo varjamine võimaldab mitte rikkuda teiste inimeste privaatsust.
-    4.2. Kui juhtide ja teiste inimeste näod ei ole varjatud, selline foto tagasi lükatakse.`,
+    4.2. Kui juhtide ja teiste inimeste näod ei ole varjatud, selline foto tagasi lükatakse.
+    4.3. Busside, veoautode ja muu transpordivahendite puhul peab numbrimärk olema pildil (vt. "Foto kvaliteet 1.1"), aga eraautode numbrimärgid peavad tagaplaanil olema juba varjatud.`,
     variant: "attention"
   },
   {
