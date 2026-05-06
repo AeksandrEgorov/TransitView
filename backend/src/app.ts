@@ -8,6 +8,7 @@ import referenceRoutes from "./routes/reference.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import vehicleManageRoutes from "./routes/vehicleManage.routes.js";
 import photoManageRoutes from "./routes/photoManage.routes.js";
+import statsRoutes from "./routes/stats.routes.js";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use("/api/photos", photoRoutes);
 app.use("/api/manage/photos", photoManageRoutes);
 app.use("/api/reference", referenceRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/stats", statsRoutes);
 
 const PORT = process.env.PORT || 5000;
 
