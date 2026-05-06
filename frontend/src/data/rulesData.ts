@@ -18,9 +18,9 @@ export const GALLERY_RULES: Rule[] = [
     3. Fotol ei tohi sõidukit varjata kõrvalised objektid.
     3.1. Kui sõiduk on mingite objektidega tugevalt varjatud ja see takistab sõiduki nägemist, lükatakse foto tagasi.
     3.2. Kui sõiduk on mingite objektide varjus, kuid see ei häiri sõiduki nähtavust, teeb vastuvõtmise otsuse administraator.
-    4. (Soovituslik) Soovitame fotol olevate autojuhtide ja teiste inimeste näod ära varjata, kuna me hoolime nii fotograafide kui ka teiste inimeste turvalisusest.
+    4. Fotol olevate autojuhtide ja teiste inimeste peavad olema ära varjatud, kuna me hoolime nii fotograafide kui ka teiste inimeste turvalisusest.
     4.1. Näo varjamine võimaldab mitte rikkuda teiste inimeste privaatsust.
-    4.2. Kui juhtide ja teiste inimeste näod ei ole varjatud, võib administraator selle foto tagasi lükata.`,
+    4.2. Kui juhtide ja teiste inimeste näod ei ole varjatud, selline foto tagasi lükatakse.`,
     variant: "attention"
   },
   {
@@ -39,7 +39,7 @@ export const GALLERY_RULES: Rule[] = [
     description: `Foto sisu võib olla mis tahes, kuid on mõned erandid.
     1. Fotol ei tohi olla sõjaväe- ega politseitehnikat ja politseinikuid ise, kuna sellist tehnikat ja inimesi ei tohi seaduse järgi pildistada.
     2. Fotol ei tohi olla sõjalisi objekte, kuna see on seadusega keelatud.
-    3. fotol ei tohi olla politseijaoskondade piirkondi.
+    3. Fotol ei tohi olla politseijaoskondade piirkondi.
     4. Suletud aladel (sõidukipargid, tööalad jms) tehtud fotod peavad rangelt vastama selle ettevõtte loatele.
     4.1. Selliste kohtade puhul tuleb võtta ühendust administraatoriga ja saata talle väljastatud luba.
     4.2. Seda luba kontrollib administraator ja selle alusel teeb ta otsuse sellistest kohtadest pärit fotode vastuvõtmise kohta.`,

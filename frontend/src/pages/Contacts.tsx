@@ -181,7 +181,7 @@ function Contacts() {
 
           <div className="rounded-[26px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-800">
             <span className="font-bold">NB!</span> Ärge saatke vormi kaudu
-            paroole ega tundlikke isikuandmeid. Vastame tavaliselt 24–48 tunni
+            paroole ega tundlikke isikuandmeid. Vastame tavaliselt 3 päeva
             jooksul.
           </div>
         </div>
