@@ -1,27 +1,125 @@
 import type { Response } from "express";
 import bcrypt from "bcrypt";
+
 import type { AuthRequest } from "../types/auth.js";
 import {
-  getAllUsers,
+  createUser,
+  deleteUser,
   getUserById,
   getUserByUsername,
-  createUser,
+  getUsers,
   updateUser,
-  deleteUser,
 } from "../services/user.service.js";
 import {
   createUserSchema,
   updateUserSchema,
 } from "../validators/user.validator.js";
 
+type UserRoleValue = "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";
+
+type UserListQuery = {
+  page?: string | string[];
+  limit?: string | string[];
+  role?: string | string[];
+  search?: string | string[];
+};
+
+function getSingleString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value) && typeof value[0] === "string") {
+    return value[0];
+  }
+
+  return undefined;
+}
+
+function parseUserRole(value: unknown): UserRoleValue | undefined | null {
+  const role = getSingleString(value);
+
+  if (!role) {
+    return undefined;
+  }
+
+  if (role === "Kasutaja") return "Kasutaja";
+  if (role === "Andmebaasi_toimetaja") return "Andmebaasi_toimetaja";
+  if (role === "Administraator") return "Administraator";
+
+  return null;
+}
+
+function parsePositiveId(value: unknown) {
+  const rawValue = getSingleString(value);
+  const id = Number(rawValue);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+
+  return id;
+}
+
+function isPrismaNotFoundError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2025"
+  );
+}
+
+function isPrismaUniqueError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2002"
+  );
+}
+
+function isPrismaForeignKeyError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2003"
+  );
+}
+
 export async function getUsersHandler(
-  _req: AuthRequest,
+  req: AuthRequest,
   res: Response
 ): Promise<void> {
   try {
-    const users = await getAllUsers();
+    const query = req.query as UserListQuery;
 
-    res.status(200).json(users);
+    const page = Math.max(Number(getSingleString(query.page)) || 1, 1);
+
+    const limit = Math.min(
+      Math.max(Number(getSingleString(query.limit)) || 10, 1),
+      50
+    );
+
+    const role = parseUserRole(query.role);
+
+    if (role === null) {
+      res.status(400).json({
+        message:
+          "Invalid role. Allowed values: Kasutaja, Andmebaasi_toimetaja, Administraator",
+      });
+      return;
+    }
+
+    const result = await getUsers({
+      page,
+      limit,
+      role,
+      search: getSingleString(query.search)?.trim() || undefined,
+    });
+
+    res.status(200).json(result);
   } catch (error) {
     console.error("Get users error:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -33,9 +131,9 @@ export async function getUserHandler(
   res: Response
 ): Promise<void> {
   try {
-    const userId = Number(req.params.id);
+    const userId = parsePositiveId(req.params.id);
 
-    if (Number.isNaN(userId)) {
+    if (!userId) {
       res.status(400).json({ message: "Invalid user id" });
       return;
     }
@@ -100,6 +198,13 @@ export async function createUserHandler(
       user,
     });
   } catch (error) {
+    if (isPrismaUniqueError(error)) {
+      res.status(409).json({
+        message: "Username already exists",
+      });
+      return;
+    }
+
     console.error("Create user error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
@@ -110,9 +215,9 @@ export async function updateUserHandler(
   res: Response
 ): Promise<void> {
   try {
-    const userId = Number(req.params.id);
+    const userId = parsePositiveId(req.params.id);
 
-    if (Number.isNaN(userId)) {
+    if (!userId) {
       res.status(400).json({ message: "Invalid user id" });
       return;
     }
@@ -157,7 +262,7 @@ export async function updateUserHandler(
     const updateData: {
       username?: string;
       password_hash?: string;
-      role?: "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";
+      role?: UserRoleValue;
     } = {};
 
     if (body.username !== undefined) {
@@ -179,6 +284,18 @@ export async function updateUserHandler(
       user: updatedUser,
     });
   } catch (error) {
+    if (isPrismaNotFoundError(error)) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    if (isPrismaUniqueError(error)) {
+      res.status(409).json({
+        message: "Username already exists",
+      });
+      return;
+    }
+
     console.error("Update user error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
@@ -189,9 +306,9 @@ export async function deleteUserHandler(
   res: Response
 ): Promise<void> {
   try {
-    const userId = Number(req.params.id);
+    const userId = parsePositiveId(req.params.id);
 
-    if (Number.isNaN(userId)) {
+    if (!userId) {
       res.status(400).json({ message: "Invalid user id" });
       return;
     }
@@ -224,6 +341,19 @@ export async function deleteUserHandler(
       user: deletedUser,
     });
   } catch (error) {
+    if (isPrismaNotFoundError(error)) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    if (isPrismaForeignKeyError(error)) {
+      res.status(409).json({
+        message:
+          "User cannot be deleted because they have related vehicles or photos",
+      });
+      return;
+    }
+
     console.error("Delete user error:", error);
     res.status(500).json({ message: "Internal server error" });
   }

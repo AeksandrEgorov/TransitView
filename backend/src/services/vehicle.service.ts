@@ -1,21 +1,23 @@
 import prisma from "../config/prisma.js";
-import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
+import {
+  Prisma,
+  ReviewStatus,
+  type VehicleCondition,
+} from "../generated/prisma/client.js";
 import type { UpdateVehicleBody } from "../types/vehicle.js";
+import { dbView } from "../utils/dbView.js";
 
 interface GetPublicVehiclesParams {
   page: number;
   limit: number;
   regNumber?: string;
-
   cityId?: number;
   countyId?: number;
   categoryId?: number;
   modelId?: number;
   companyId?: number;
   branchId?: number;
-
   condition?: string;
-
   createdFrom?: Date;
   createdTo?: Date;
 }
@@ -40,48 +42,97 @@ interface CreateVehicleWithFirstPhotoData {
     | "Maha_kantud"
     | "Müüdud"
     | "Teadmata";
-
   city_id: number;
   place: string;
   taken_at?: string | null;
   file_path: string;
   cloudinary_public_id?: string | null;
-
   user_id: number;
 }
 
-const vehiclePublicInclude = {
-  model: {
-    include: {
-      category: true,
-    },
-  },
-  branch: {
-    include: {
-      company: true,
-      city: {
-        include: {
-          county: true,
-        },
-      },
-    },
-  },
-  photos: {
-    where: {
-      status: ReviewStatus.Kinnitatud,
-    },
-    orderBy: {
-      created_at: "asc" as const,
-    },
-    take: 1,
-    include: {
-      city: {
-        include: {
-          county: true,
-        },
-      },
-    },
-  },
+type CountRow = {
+  total: bigint | number;
+};
+
+type PublicVehicleViewRow = {
+  vehicle_id: number;
+  reg_number: string;
+  vla_year: number | null;
+  vin_code: string | null;
+  chassis: string | null;
+  condition: string;
+  status: string;
+  created_at: Date;
+
+  model_id: number;
+  manufacturer: string;
+  model_name: string;
+
+  category_id: number;
+  category_name: string;
+
+  branch_id: number | null;
+  branch_name: string | null;
+
+  company_id: number | null;
+  company_name: string | null;
+
+  branch_city_id: number | null;
+  branch_city_name: string | null;
+
+  branch_county_id: number | null;
+  branch_county_name: string | null;
+
+  creator_id: number | null;
+  creator_username: string | null;
+
+  cover_photo_id: number | null;
+  cover_photo_url: string | null;
+  cover_photo_cloudinary_public_id: string | null;
+  cover_photo_place: string | null;
+  cover_photo_taken_at: Date | null;
+  cover_photo_created_at: Date | null;
+  cover_photo_city_id: number | null;
+  cover_photo_city_name: string | null;
+  cover_photo_county_id: number | null;
+  cover_photo_county_name: string | null;
+
+  confirmed_photos_count: number;
+};
+
+type MyVehicleViewRow = {
+  vehicle_id: number;
+  model_id: number;
+  branch_id: number | null;
+  reg_number: string;
+  vla_year: number | null;
+  vin_code: string | null;
+  chassis: string | null;
+  condition: string;
+  status: string;
+  review_comment: string | null;
+  created_by: number;
+  reviewed_by: number | null;
+  reviewed_at: Date | null;
+  created_at: Date;
+
+  manufacturer: string;
+  model_name: string;
+
+  category_id: number;
+  category_name: string;
+
+  branch_name: string | null;
+  company_name: string | null;
+
+  creator_username: string | null;
+  reviewer_username: string | null;
+
+  cover_photo_id: number | null;
+  cover_photo_url: string | null;
+  cover_photo_cloudinary_public_id: string | null;
+
+  photos_count: number;
 };
 
 const vehicleDashboardInclude = {
@@ -129,6 +180,164 @@ const vehicleDashboardInclude = {
   },
 };
 
+function mapPublicVehicleFromView(row: PublicVehicleViewRow) {
+  const coverPhoto = row.cover_photo_id
+    ? {
+        photo_id: row.cover_photo_id,
+        vehicle_id: row.vehicle_id,
+        city_id: row.cover_photo_city_id,
+        place: row.cover_photo_place,
+        taken_at: row.cover_photo_taken_at,
+        file_path: row.cover_photo_url,
+        cloudinary_public_id: row.cover_photo_cloudinary_public_id,
+        status: ReviewStatus.Kinnitatud,
+        review_comment: null,
+        reviewed_at: null,
+        created_at: row.cover_photo_created_at,
+        city: row.cover_photo_city_id
+          ? {
+              city_id: row.cover_photo_city_id,
+              name: row.cover_photo_city_name,
+              county: {
+                county_id: row.cover_photo_county_id,
+                name: row.cover_photo_county_name,
+              },
+            }
+          : null,
+      }
+    : null;
+
+  return {
+    vehicle_id: row.vehicle_id,
+    model_id: row.model_id,
+    branch_id: row.branch_id,
+    reg_number: row.reg_number,
+    vla_year: row.vla_year,
+    vin_code: row.vin_code,
+    chassis: row.chassis,
+    condition: row.condition as VehicleCondition,
+    status: row.status as ReviewStatus,
+    review_comment: null,
+    created_by: row.creator_id,
+    reviewed_by: null,
+    reviewed_at: null,
+    created_at: row.created_at,
+
+    model: {
+      model_id: row.model_id,
+      manufacturer: row.manufacturer,
+      name: row.model_name,
+      category_id: row.category_id,
+      category: {
+        category_id: row.category_id,
+        name: row.category_name,
+      },
+    },
+
+    branch: row.branch_id
+      ? {
+          branch_id: row.branch_id,
+          company_id: row.company_id,
+          city_id: row.branch_city_id,
+          branch_name: row.branch_name,
+          company: row.company_id
+            ? {
+                company_id: row.company_id,
+                name: row.company_name,
+              }
+            : null,
+          city: row.branch_city_id
+            ? {
+                city_id: row.branch_city_id,
+                name: row.branch_city_name,
+                county: {
+                  county_id: row.branch_county_id,
+                  name: row.branch_county_name,
+                },
+              }
+            : null,
+        }
+      : null,
+
+    creator: row.creator_id
+      ? {
+          user_id: row.creator_id,
+          username: row.creator_username,
+        }
+      : null,
+
+    reviewer: null,
+    photos: coverPhoto ? [coverPhoto] : [],
+    confirmed_photos_count: row.confirmed_photos_count,
+  };
+}
+
+function mapMyVehicleFromView(row: MyVehicleViewRow) {
+  const coverPhoto = row.cover_photo_id
+    ? {
+        photo_id: row.cover_photo_id,
+        vehicle_id: row.vehicle_id,
+        file_path: row.cover_photo_url,
+        cloudinary_public_id: row.cover_photo_cloudinary_public_id,
+      }
+    : null;
+
+  return {
+    vehicle_id: row.vehicle_id,
+    model_id: row.model_id,
+    branch_id: row.branch_id,
+    reg_number: row.reg_number,
+    vla_year: row.vla_year,
+    vin_code: row.vin_code,
+    chassis: row.chassis,
+    condition: row.condition as VehicleCondition,
+    status: row.status as ReviewStatus,
+    review_comment: row.review_comment,
+    created_by: row.created_by,
+    reviewed_by: row.reviewed_by,
+    reviewed_at: row.reviewed_at,
+    created_at: row.created_at,
+
+    model: {
+      model_id: row.model_id,
+      manufacturer: row.manufacturer,
+      name: row.model_name,
+      category_id: row.category_id,
+      category: {
+        category_id: row.category_id,
+        name: row.category_name,
+      },
+    },
+
+    branch: row.branch_id
+      ? {
+          branch_id: row.branch_id,
+          branch_name: row.branch_name,
+          company: row.company_name
+            ? {
+                name: row.company_name,
+              }
+            : null,
+        }
+      : null,
+
+    creator: {
+      user_id: row.created_by,
+      username: row.creator_username,
+    },
+
+    reviewer: row.reviewed_by
+      ? {
+          user_id: row.reviewed_by,
+          username: row.reviewer_username,
+        }
+      : null,
+
+    photos: coverPhoto ? [coverPhoto] : [],
+    photos_count: row.photos_count,
+  };
+}
+
 export async function getPublicVehicles(params: GetPublicVehiclesParams) {
   const {
     page,
@@ -146,102 +355,95 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
   } = params;
 
   const skip = (page - 1) * limit;
+  const filters: Prisma.Sql[] = [];
 
-  const createdAtWhere =
-    createdFrom || createdTo
-      ? {
-          ...(createdFrom ? { gte: createdFrom } : {}),
-          ...(createdTo ? { lte: createdTo } : {}),
-        }
-      : undefined;
+  if (regNumber) {
+    filters.push(Prisma.sql`v.reg_number ILIKE ${`%${regNumber}%`}`);
+  }
 
-  const locationFilter =
-    cityId || countyId
-      ? {
-          OR: [
-            {
-              branch: {
-                ...(cityId ? { city_id: cityId } : {}),
-                ...(countyId
-                  ? {
-                      city: {
-                        county_id: countyId,
-                      },
-                    }
-                  : {}),
-              },
-            },
-            {
-              photos: {
-                some: {
-                  status: ReviewStatus.Kinnitatud,
-                  ...(cityId ? { city_id: cityId } : {}),
-                  ...(countyId
-                    ? {
-                        city: {
-                          county_id: countyId,
-                        },
-                      }
-                    : {}),
-                },
-              },
-            },
-          ],
-        }
-      : {};
+  if (modelId) {
+    filters.push(Prisma.sql`v.model_id = ${modelId}`);
+  }
 
-  const where = {
-    status: ReviewStatus.Kinnitatud,
+  if (branchId) {
+    filters.push(Prisma.sql`v.branch_id = ${branchId}`);
+  }
 
-    ...(regNumber
-      ? {
-          reg_number: {
-            contains: regNumber,
-            mode: "insensitive" as const,
-          },
-        }
-      : {}),
+  if (companyId) {
+    filters.push(Prisma.sql`v.company_id = ${companyId}`);
+  }
 
-    ...(modelId ? { model_id: modelId } : {}),
-    ...(branchId ? { branch_id: branchId } : {}),
+  if (categoryId) {
+    filters.push(Prisma.sql`v.category_id = ${categoryId}`);
+  }
 
-    ...(companyId
-      ? {
-          branch: {
-            company_id: companyId,
-          },
-        }
-      : {}),
+  if (condition) {
+    filters.push(Prisma.sql`v.condition = ${condition}`);
+  }
 
-    ...(condition ? { condition: condition as VehicleCondition } : {}),
-    ...(createdAtWhere ? { created_at: createdAtWhere } : {}),
+  if (createdFrom) {
+    filters.push(Prisma.sql`v.created_at >= ${createdFrom}`);
+  }
 
-    ...(categoryId
-      ? {
-          model: {
-            category_id: categoryId,
-          },
-        }
-      : {}),
+  if (createdTo) {
+    filters.push(Prisma.sql`v.created_at <= ${createdTo}`);
+  }
 
-    ...locationFilter,
-  };
+  if (cityId || countyId) {
+    const branchLocationFilters: Prisma.Sql[] = [];
+    const photoLocationFilters: Prisma.Sql[] = [];
 
-  const [items, total] = await Promise.all([
-    prisma.vehicles.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: {
-        created_at: "desc",
-      },
-      include: vehiclePublicInclude,
-    }),
-    prisma.vehicles.count({ where }),
+    if (cityId) {
+      branchLocationFilters.push(Prisma.sql`v.branch_city_id = ${cityId}`);
+      photoLocationFilters.push(Prisma.sql`p.city_id = ${cityId}`);
+    }
+
+    if (countyId) {
+      branchLocationFilters.push(
+        Prisma.sql`v.branch_county_id = ${countyId}`
+      );
+      photoLocationFilters.push(Prisma.sql`p.county_id = ${countyId}`);
+    }
+
+    filters.push(Prisma.sql`
+      (
+        (${Prisma.join(branchLocationFilters, " AND ")})
+        OR EXISTS (
+          SELECT 1
+          FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
+          WHERE p.vehicle_id = v.vehicle_id
+            AND ${Prisma.join(photoLocationFilters, " AND ")}
+        )
+      )
+    `);
+  }
+
+  const whereSql =
+    filters.length > 0
+      ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
+      : Prisma.empty;
+
+  const [items, totalRows] = await Promise.all([
+    prisma.$queryRaw<PublicVehicleViewRow[]>`
+      SELECT *
+      FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+      ${whereSql}
+      ORDER BY v.created_at DESC, v.vehicle_id DESC
+      OFFSET ${skip}
+      LIMIT ${limit}
+    `,
+
+    prisma.$queryRaw<CountRow[]>`
+      SELECT COUNT(*) AS total
+      FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+      ${whereSql}
+    `,
   ]);
 
+  const total = Number(totalRows[0]?.total ?? 0);
+
   return {
-    items,
+    items: items.map(mapPublicVehicleFromView),
     meta: {
       page,
       limit,
@@ -251,31 +453,56 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
   };
 }
 
+export async function getVehicleById(vehicleId: number) {
+  const rows = await prisma.$queryRaw<PublicVehicleViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+    WHERE v.vehicle_id = ${vehicleId}
+    LIMIT 1
+  `;
+
+  const vehicle = rows[0];
+
+  if (!vehicle) {
+    return null;
+  }
+
+  return mapPublicVehicleFromView(vehicle);
+}
+
 export async function getMyVehicles(params: GetMyVehiclesParams) {
   const { userId, page, limit, status } = params;
-
   const skip = (page - 1) * limit;
 
-  const where = {
-    created_by: userId,
-    ...(status ? { status } : {}),
-  };
+  const filters: Prisma.Sql[] = [Prisma.sql`v.created_by = ${userId}`];
 
-  const [items, total] = await Promise.all([
-    prisma.vehicles.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: {
-        created_at: "desc",
-      },
-      include: vehicleDashboardInclude,
-    }),
-    prisma.vehicles.count({ where }),
+  if (status) {
+    filters.push(Prisma.sql`v.status = ${status}`);
+  }
+
+  const whereSql = Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`;
+
+  const [items, totalRows] = await Promise.all([
+    prisma.$queryRaw<MyVehicleViewRow[]>`
+      SELECT *
+      FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
+      ${whereSql}
+      ORDER BY v.created_at DESC, v.vehicle_id DESC
+      OFFSET ${skip}
+      LIMIT ${limit}
+    `,
+
+    prisma.$queryRaw<CountRow[]>`
+      SELECT COUNT(*) AS total
+      FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
+      ${whereSql}
+    `,
   ]);
 
+  const total = Number(totalRows[0]?.total ?? 0);
+
   return {
-    items,
+    items: items.map(mapMyVehicleFromView),
     meta: {
       page,
       limit,
@@ -344,68 +571,6 @@ export async function getMyVehicleById(vehicleId: number, userId: number) {
   });
 }
 
-export async function getVehicleById(vehicleId: number) {
-  return prisma.vehicles.findFirst({
-    where: {
-      vehicle_id: vehicleId,
-      status: ReviewStatus.Kinnitatud,
-    },
-    include: {
-      model: {
-        include: {
-          category: true,
-        },
-      },
-      branch: {
-        include: {
-          company: true,
-          city: {
-            include: {
-              county: true,
-            },
-          },
-        },
-      },
-      creator: {
-        select: {
-          user_id: true,
-          username: true,
-          role: true,
-        },
-      },
-      reviewer: {
-        select: {
-          user_id: true,
-          username: true,
-          role: true,
-        },
-      },
-      photos: {
-        where: {
-          status: ReviewStatus.Kinnitatud,
-        },
-        orderBy: {
-          created_at: "asc",
-        },
-        take: 1,
-        include: {
-          author: {
-            select: {
-              user_id: true,
-              username: true,
-            },
-          },
-          city: {
-            include: {
-              county: true,
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
 export async function createVehicleWithFirstPhoto(
   data: CreateVehicleWithFirstPhotoData
 ) {
@@ -439,7 +604,10 @@ export async function createVehicleWithFirstPhoto(
       },
     });
 
-    return { vehicle, photo };
+    return {
+      vehicle,
+      photo,
+    };
   });
 }
 

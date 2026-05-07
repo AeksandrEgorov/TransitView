@@ -1,65 +1,24 @@
 import prisma from "../config/prisma.js";
-import { ReviewStatus } from "../generated/prisma/client.js";
+import { dbView } from "../utils/dbView.js";
+
+type PublicStatsRow = {
+  vehicles_total: number;
+  photos_total: number;
+  categories_total: number;
+  cities_total: number;
+};
 
 export async function getPublicStats() {
-  const confirmedVehicleWhere = {
-    status: ReviewStatus.Kinnitatud,
-  };
+  const rows = await prisma.$queryRawUnsafe<PublicStatsRow[]>(
+    `SELECT * FROM ${dbView("v_public_stats")}`
+  );
 
-  const confirmedPhotoWhere = {
-    status: ReviewStatus.Kinnitatud,
-    vehicle: {
-      status: ReviewStatus.Kinnitatud,
-    },
-  };
-
-  const [
-    vehiclesTotal,
-    photosTotal,
-    vehiclesWithCategory,
-    photosWithCity,
-  ] = await Promise.all([
-    prisma.vehicles.count({
-      where: confirmedVehicleWhere,
-    }),
-
-    prisma.photos.count({
-      where: confirmedPhotoWhere,
-    }),
-
-    prisma.vehicles.findMany({
-      where: confirmedVehicleWhere,
-      select: {
-        model: {
-          select: {
-            category_id: true,
-          },
-        },
-      },
-    }),
-
-    prisma.photos.findMany({
-      where: {
-        ...confirmedPhotoWhere,
-        city_id: {
-          not: null,
-        },
-      },
-      select: {
-        city_id: true,
-      },
-      distinct: ["city_id"],
-    }),
-  ]);
-
-  const categoriesTotal = new Set(
-    vehiclesWithCategory.map((vehicle) => vehicle.model.category_id)
-  ).size;
+  const stats = rows[0];
 
   return {
-    vehiclesTotal,
-    photosTotal,
-    categoriesTotal,
-    citiesTotal: photosWithCity.length,
+    vehiclesTotal: stats?.vehicles_total ?? 0,
+    photosTotal: stats?.photos_total ?? 0,
+    categoriesTotal: stats?.categories_total ?? 0,
+    citiesTotal: stats?.cities_total ?? 0,
   };
 }

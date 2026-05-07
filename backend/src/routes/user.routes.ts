@@ -1,49 +1,25 @@
 import { Router } from "express";
+
 import {
-  getUsersHandler,
-  getUserHandler,
   createUserHandler,
-  updateUserHandler,
   deleteUserHandler,
+  getUserHandler,
+  getUsersHandler,
+  updateUserHandler,
 } from "../controllers/user.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
 
 const router = Router();
 
-router.get(
-  "/",
-  requireAuth,
-  requireRole("Administraator"),
-  getUsersHandler
-);
+router.use(requireAuth);
+router.use(requireRole("Administraator"));
 
-router.get(
-  "/:id",
-  requireAuth,
-  requireRole("Administraator"),
-  getUserHandler
-);
+router.get("/", getUsersHandler);
+router.get("/:id", getUserHandler);
 
-router.post(
-  "/",
-  requireAuth,
-  requireRole("Administraator"),
-  createUserHandler
-);
-
-router.patch(
-  "/:id",
-  requireAuth,
-  requireRole("Administraator"),
-  updateUserHandler
-);
-
-router.delete(
-  "/:id",
-  requireAuth,
-  requireRole("Administraator"),
-  deleteUserHandler
-);
+router.post("/", createUserHandler);
+router.patch("/:id", updateUserHandler);
+router.delete("/:id", deleteUserHandler);
 
 export default router;
