@@ -4,5 +4,8 @@ export const categories = [
   { name: "Traktor" },
   { name: "Vedur" },
   { name: "Tramm" },
-  { name: "Lennuk" }
+  { name: "Lennuk" },
+  { name: "Reisirong" },
+  { name: "Troll" },
+  { name: "Raudteeehitustehnika" },
 ];

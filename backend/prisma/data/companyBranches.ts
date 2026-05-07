@@ -6,4 +6,6 @@ export const companyBranches = [
   { companyName: "MReisid FIE", cityName: "Narva", branchName: "Narva osakond (mreisid)" },
   { companyName: "Nordpont OÜ", cityName: "Tallinn", branchName: "Tallinna osakond (nordpont)" },
   { companyName: "Tallinna Linnatransport AS", cityName: "Tallinn", branchName: "Tallinna osakond (tlt)" },
-]
+  { companyName: "Elron AS", cityName: "Tallinn", branchName: "Tallinna osakond (elron)" },
+  { companyName: "GoTrack OÜ", cityName: "Tallinn", branchName: "Tallinna osakond (gotrack)" },
+];
