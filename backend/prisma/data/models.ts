@@ -19,4 +19,7 @@ export const models = [
   { manufacturer: "Scania", name: "P340", categoryName: "Veoauto" },
   { manufacturer: "Mercedes-Benz", name: "Sprinter 516cdi", categoryName: "Buss" },
   { manufacturer: "JCB", name: "4cx eco", categoryName: "Traktor" },
+  { manufacturer: "Stadler", name: "Flirt DMU", categoryName: "Reisirong" },
+  { manufacturer: "Solaris", name: "Trollino III 12 ac", categoryName: "Troll" },
+  { manufacturer: "VR Kuopion konepaja", name: "Tka8", categoryName: "Raudteeehitustehnika" },
 ];

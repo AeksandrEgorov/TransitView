@@ -5,5 +5,7 @@ export const companies = [
   { name: "Nordpont OÜ", cityName: "Tallinn" },
   { name: "Tallinna Linnatransport AS", cityName: "Tallinn" },
   { name: "Atko Grupp AS", cityName: "Kohtla-Järve" },
-  { name: "Ekovir OÜ", cityName: "Narva" }
+  { name: "Ekovir OÜ", cityName: "Narva" },
+  { name: "Elron AS", cityName: "Tallinn" },
+  { name: "GoTrack OÜ", cityName: "Tallinn" },
 ];
