@@ -188,7 +188,7 @@ function AddPhotoModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose}>
+    <Modal isOpen={isOpen} onClose={handleClose} size="lg">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">
           Lisa foto

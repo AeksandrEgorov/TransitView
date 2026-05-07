@@ -5,7 +5,7 @@ export const photos = [
     cityName: "Tallinn",
     place: "Pärnu mnt",
     takenAt: new Date("2023-10-13T10:01:12"),
-    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1775649306/Pilt_1_jpvsdl.jpg",
+    filePath: "https://res.cloudinary.com/dok3gwhuz/image/upload/v1778144984/Pilt_1_fdphcf.jpg",
     status: "Kinnitatud",
     cloudinaryPublicId: null,
     reviewComment: "",
