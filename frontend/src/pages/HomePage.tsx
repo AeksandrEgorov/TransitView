@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { getVehicles } from "../config/vehicleApi";
 import { getCategories, getCities, getCounties } from "../config/referenceApi";
+import { getPublicStats, type PublicStats } from "../config/statsApi";
 import VehicleCard from "../components/home/VehicleCard";
 import VehicleFilters from "../components/home/VehicleFilters";
 import PageHero from "../components/ui/PageHero";
+import PublicStatsSection from "../components/ui/PublicStatsSection";
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
@@ -20,6 +23,9 @@ function HomePage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [counties, setCounties] = useState<CountyItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
+
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -71,6 +77,29 @@ function HomePage() {
     }
 
     loadReferenceData();
+  }, [showToast]);
+
+  useEffect(() => {
+    async function loadPublicStats() {
+      try {
+        setIsStatsLoading(true);
+
+        const data = await getPublicStats();
+        setPublicStats(data);
+      } catch (error) {
+        console.error(error);
+
+        showToast({
+          variant: "error",
+          title: "Statistika laadimine ebaõnnestus",
+          message: "Avalikku statistikat ei õnnestunud laadida.",
+        });
+      } finally {
+        setIsStatsLoading(false);
+      }
+    }
+
+    loadPublicStats();
   }, [showToast]);
 
   useEffect(() => {
@@ -195,7 +224,9 @@ function HomePage() {
   }
 
   function handlePageChange(newPage: number) {
-    if (newPage === page || newPage < 1 || newPage > totalPages) return;
+    if (newPage === page || newPage < 1 || newPage > totalPages) {
+      return;
+    }
 
     shouldKeepPaginationVisibleRef.current = true;
     setPage(newPage);
@@ -208,6 +239,8 @@ function HomePage() {
         title="Transpordi andmebaas"
         description="Sirvi kinnitatud transpordikaarte, filtreeri tulemusi ja ava detailvaade koos fotodega."
       />
+
+      <PublicStatsSection stats={publicStats} isLoading={isStatsLoading} />
 
       <VehicleFilters
         search={search}

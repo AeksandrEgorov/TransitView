@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
+
+import NativeDateInput from "../ui/NativeDateInput";
 import type { CategoryItem, CityItem, CountyItem } from "../../types/reference";
 import type { VehicleCondition } from "../../types/vehicle";
 import { formatVehicleCondition } from "../../utils/formatters";
+import { getTodayIsoDate } from "../../utils/date";
 
 const conditions: VehicleCondition[] = [
   "Töökorras",
@@ -55,7 +58,7 @@ function GalleryFilters({
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayIsoDate();
 
   const activeFiltersCount = [
     search.trim(),
@@ -89,7 +92,7 @@ function GalleryFilters({
   }
 
   return (
-    <section className="overflow-hidden rounded-[30px] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80">
+    <section className="rounded-[30px] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80">
       <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -261,12 +264,10 @@ function GalleryFilters({
                 Lisatud alates
               </label>
 
-              <input
-                type="date"
+              <NativeDateInput
                 value={createdFrom}
                 max={createdTo || today}
-                onChange={(event) => handleCreatedFromChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                onChange={handleCreatedFromChange}
               />
             </div>
 
@@ -275,13 +276,11 @@ function GalleryFilters({
                 Lisatud kuni
               </label>
 
-              <input
-                type="date"
+              <NativeDateInput
                 value={createdTo}
                 min={createdFrom || undefined}
                 max={today}
-                onChange={(event) => handleCreatedToChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                onChange={handleCreatedToChange}
               />
             </div>
           </div>

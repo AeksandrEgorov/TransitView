@@ -2,10 +2,13 @@ import { useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
 import Modal from "../ui/Modal";
+import RequiredLabel from "../ui/RequiredLabel";
+import NativeDateInput from "../ui/NativeDateInput";
 import { createPhoto, uploadPhotoFile } from "../../config/photoApi";
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import type { CityItem } from "../../types/reference";
+import { getTodayIsoDate } from "../../utils/date";
 
 interface Props {
   isOpen: boolean;
@@ -41,19 +44,21 @@ function AddPhotoModal({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const today = getTodayIsoDate();
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cityId, setCityId] = useState("");
   const [place, setPlace] = useState("");
-  const [takenAt, setTakenAt] = useState("");
+  const [takenAt, setTakenAt] = useState(getTodayIsoDate());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const isPlaceRequired = cityId === "";
 
   function resetForm() {
     setSelectedFile(null);
     setCityId("");
     setPlace("");
-    setTakenAt("");
+    setTakenAt(getTodayIsoDate());
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -126,6 +131,26 @@ function AddPhotoModal({
       return;
     }
 
+    if (isPlaceRequired && !place.trim()) {
+      showToast({
+        variant: "error",
+        title: "Koht puudub",
+        message: "Kui linn ei ole valitud, siis peab koht olema täidetud.",
+      });
+
+      return;
+    }
+
+    if (!takenAt) {
+      showToast({
+        variant: "error",
+        title: "Kuupäev puudub",
+        message: "Pildistamise kuupäev peab olema täidetud.",
+      });
+
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -134,12 +159,8 @@ function AddPhotoModal({
       await createPhoto({
         vehicle_id: vehicleId,
         ...(cityId ? { city_id: Number(cityId) } : {}),
-        ...(place.trim() ? { place: place.trim() } : {}),
-        ...(takenAt
-          ? {
-              taken_at: new Date(`${takenAt}T00:00:00.000Z`).toISOString(),
-            }
-          : {}),
+        place: place.trim(),
+        taken_at: new Date(`${takenAt}T00:00:00.000Z`).toISOString(),
         file_path: uploaded.file_path,
         cloudinary_public_id: uploaded.public_id,
       });
@@ -182,13 +203,16 @@ function AddPhotoModal({
           <span className="font-semibold text-slate-900">Ootel</span>.
           Avalikult nähtavaks muutub see pärast modereerimist.
         </p>
+
+        <p className="mt-3 text-xs text-slate-500">
+          Tärniga <span className="font-bold text-red-500">*</span> märgitud
+          väljad on kohustuslikud.
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-5" lang="et-EE">
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Foto
-          </label>
+          <RequiredLabel required>Foto</RequiredLabel>
 
           <input
             ref={fileInputRef}
@@ -212,9 +236,7 @@ function AddPhotoModal({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Linn
-          </label>
+          <RequiredLabel>Linn</RequiredLabel>
 
           <select
             value={cityId}
@@ -229,12 +251,14 @@ function AddPhotoModal({
               </option>
             ))}
           </select>
+
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Kui linn puudub, siis on koha täitmine kohustuslik.
+          </p>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Koht
-          </label>
+          <RequiredLabel required={isPlaceRequired}>Koht</RequiredLabel>
 
           <input
             type="text"
@@ -242,21 +266,33 @@ function AddPhotoModal({
             onChange={(event) => setPlace(event.target.value)}
             placeholder="Näiteks bussijaam, tänav, peatus..."
             className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            required={isPlaceRequired}
           />
+
+          {isPlaceRequired ? (
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Koht on kohustuslik, sest linn ei ole valitud.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Kui linn on valitud, võib koha väli jääda tühjaks.
+            </p>
+          )}
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Pildistamise kuupäev
-          </label>
+          <RequiredLabel required>Pildistamise kuupäev</RequiredLabel>
 
-          <input
-            type="date"
+          <NativeDateInput
             value={takenAt}
-            onChange={(event) => setTakenAt(event.target.value)}
+            onChange={setTakenAt}
             max={today}
-            className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            required
           />
+
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Vaikimisi kasutatakse tänast kuupäeva.
+          </p>
         </div>
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">

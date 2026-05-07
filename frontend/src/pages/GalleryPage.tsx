@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
 
 import PageHero from "../components/ui/PageHero";
+import PublicStatsSection from "../components/ui/PublicStatsSection";
 import GalleryFilters from "../components/gallery/GalleryFilters";
 import GalleryPhotoCard from "../components/gallery/GalleryPhotoCard";
 import PhotoPreviewModal from "../components/modals/PhotoPreviewModal";
 import { getPublicPhotos } from "../config/photoApi";
 import { getCategories, getCities, getCounties } from "../config/referenceApi";
+import { getPublicStats, type PublicStats } from "../config/statsApi";
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
@@ -20,6 +22,9 @@ function GalleryPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [counties, setCounties] = useState<CountyItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
+
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -136,6 +141,29 @@ function GalleryPage() {
     }
 
     loadReferenceData();
+  }, [showToast]);
+
+  useEffect(() => {
+    async function loadPublicStats() {
+      try {
+        setIsStatsLoading(true);
+
+        const data = await getPublicStats();
+        setPublicStats(data);
+      } catch (error) {
+        console.error(error);
+
+        showToast({
+          variant: "error",
+          title: "Statistika laadimine ebaõnnestus",
+          message: "Avalikku statistikat ei õnnestunud laadida.",
+        });
+      } finally {
+        setIsStatsLoading(false);
+      }
+    }
+
+    loadPublicStats();
   }, [showToast]);
 
   useEffect(() => {
@@ -261,6 +289,8 @@ function GalleryPage() {
         title="Fotogalerii"
         description="Sirvi kinnitatud fotosid, filtreeri tulemusi sõiduki, asukoha ja lisamise kuupäeva järgi ning vaata fotosid suuremalt modaalaknas."
       />
+
+      <PublicStatsSection stats={publicStats} isLoading={isStatsLoading} />
 
       <GalleryFilters
         search={search}

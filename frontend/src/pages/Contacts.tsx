@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import PageHero from "../components/ui/PageHero";
+import RequiredLabel from "../components/ui/RequiredLabel";
 import { TEAM_DATA } from "../data/teamData";
 import { useToast } from "../hooks/useToast";
 
@@ -72,11 +73,11 @@ function Contacts() {
     const contactData = {
       form_type: contactType,
       form_type_label: contactTypeLabels[contactType],
-      full_name: fullName,
-      email,
+      full_name: fullName.trim(),
+      email: email.trim(),
       requested_role: isAccountRequest ? "Kasutaja" : "",
       topic,
-      message,
+      message: message.trim(),
     };
 
     console.log("Contact form data:", contactData);
@@ -135,6 +136,7 @@ function Contacts() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 text-blue-600">
                         {iconMap[member.variant]}
+
                         <p className="text-xs font-bold uppercase tracking-[0.2em]">
                           {member.role}
                         </p>
@@ -181,7 +183,7 @@ function Contacts() {
 
           <div className="rounded-[26px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-800">
             <span className="font-bold">NB!</span> Ärge saatke vormi kaudu
-            paroole ega tundlikke isikuandmeid. Vastame tavaliselt 3 päeva
+            paroole ega tundlikke isikuandmeid. Vastame tavaliselt 24–48 tunni
             jooksul.
           </div>
         </div>
@@ -189,6 +191,7 @@ function Contacts() {
         <form
           onSubmit={handleSubmit}
           className="rounded-[30px] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80 lg:p-7"
+          lang="et-EE"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
@@ -214,10 +217,13 @@ function Contacts() {
             {formDescription}
           </p>
 
+          <p className="mt-3 text-xs text-slate-500">
+            Tärniga <span className="font-bold text-red-500">*</span> märgitud
+            väljad on kohustuslikud.
+          </p>
+
           <div className="mt-7">
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Päringu tüüp
-            </label>
+            <RequiredLabel required>Päringu tüüp</RequiredLabel>
 
             <select
               name="contactType"
@@ -237,9 +243,7 @@ function Contacts() {
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Täisnimi
-              </label>
+              <RequiredLabel required>Täisnimi</RequiredLabel>
 
               <input
                 type="text"
@@ -253,9 +257,7 @@ function Contacts() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                E-posti aadress
-              </label>
+              <RequiredLabel required>E-posti aadress</RequiredLabel>
 
               <input
                 type="email"
@@ -271,9 +273,7 @@ function Contacts() {
 
           {isAccountRequest && (
             <div className="mt-4">
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Soovitud roll
-              </label>
+              <RequiredLabel>Soovitud roll</RequiredLabel>
 
               <input
                 type="text"
@@ -290,9 +290,9 @@ function Contacts() {
           )}
 
           <div className="mt-4">
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <RequiredLabel required>
               {isAccountRequest ? "Miks soovite kontot?" : "Teema"}
-            </label>
+            </RequiredLabel>
 
             <select
               name="topic"
@@ -338,9 +338,9 @@ function Contacts() {
           </div>
 
           <div className="mt-4">
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <RequiredLabel required>
               {isAccountRequest ? "Lisainfo" : "Sõnum"}
-            </label>
+            </RequiredLabel>
 
             <textarea
               name="message"
