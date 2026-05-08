@@ -1,14 +1,18 @@
 import { Router } from "express";
+
 import {
-  getCounties,
-  getCities,
   getCategories,
-  getModels,
+  getCities,
   getCompanies,
   getCompanyBranches,
+  getCounties,
+  getModels,
+  getPublicFilters,
 } from "../controllers/reference.controller.js";
 
 const router = Router();
+
+router.get("/public-filters", getPublicFilters);
 
 router.get("/counties", getCounties);
 router.get("/cities", getCities);

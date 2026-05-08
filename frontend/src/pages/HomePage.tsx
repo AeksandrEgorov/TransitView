@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getVehicles } from "../config/vehicleApi";
-import { getCategories, getCities, getCounties } from "../config/referenceApi";
+import { getPublicFilters } from "../config/referenceApi";
 import { getPublicStats, type PublicStats } from "../config/statsApi";
+
 import VehicleCard from "../components/home/VehicleCard";
 import VehicleFilters from "../components/home/VehicleFilters";
 import PageHero from "../components/ui/PageHero";
 import PublicStatsSection from "../components/ui/PublicStatsSection";
+
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
+
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
 import type {
   VehicleCondition,
@@ -20,6 +23,7 @@ function HomePage() {
   const { showToast } = useToast();
 
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
+
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [counties, setCounties] = useState<CountyItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -53,30 +57,38 @@ function HomePage() {
   const paginationRef = useRef<HTMLDivElement | null>(null);
   const shouldKeepPaginationVisibleRef = useRef(false);
 
-  useEffect(() => {
-    async function loadReferenceData() {
-      try {
-        const [categoriesData, countiesData, citiesData] = await Promise.all([
-          getCategories(),
-          getCounties(),
-          getCities(),
-        ]);
+  const visibleCities = useMemo(() => {
+    if (!selectedCountyId) {
+      return cities;
+    }
 
-        setCategories(categoriesData);
-        setCounties(countiesData);
-        setCities(citiesData);
+    return cities.filter((city) => city.county.county_id === selectedCountyId);
+  }, [cities, selectedCountyId]);
+
+  const pageNumbers = useMemo(() => {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }, [totalPages]);
+
+  useEffect(() => {
+    async function loadPublicFilters() {
+      try {
+        const data = await getPublicFilters();
+
+        setCategories(data.vehicleFilters.categories);
+        setCounties(data.vehicleFilters.counties);
+        setCities(data.vehicleFilters.cities);
       } catch (error) {
         console.error(error);
 
         showToast({
           variant: "error",
           title: "Andmete laadimine ebaõnnestus",
-          message: "Viiteandmeid ei õnnestunud laadida.",
+          message: "Avalike filtrite andmeid ei õnnestunud laadida.",
         });
       }
     }
 
-    loadReferenceData();
+    loadPublicFilters();
   }, [showToast]);
 
   useEffect(() => {
@@ -85,6 +97,7 @@ function HomePage() {
         setIsStatsLoading(true);
 
         const data = await getPublicStats();
+
         setPublicStats(data);
       } catch (error) {
         console.error(error);
@@ -101,38 +114,6 @@ function HomePage() {
 
     loadPublicStats();
   }, [showToast]);
-
-  useEffect(() => {
-    if (!selectedCountyId) {
-      getCities()
-        .then(setCities)
-        .catch((error) => {
-          console.error(error);
-
-          showToast({
-            variant: "error",
-            title: "Linnade laadimine ebaõnnestus",
-            message: "Linnade andmeid ei õnnestunud laadida.",
-          });
-        });
-
-      return;
-    }
-
-    setSelectedCityId(null);
-
-    getCities(selectedCountyId)
-      .then(setCities)
-      .catch((error) => {
-        console.error(error);
-
-        showToast({
-          variant: "error",
-          title: "Linnade laadimine ebaõnnestus",
-          message: "Linnade andmeid ei õnnestunud laadida.",
-        });
-      });
-  }, [selectedCountyId, showToast]);
 
   useEffect(() => {
     async function loadVehicles() {
@@ -204,10 +185,6 @@ function HomePage() {
     }
   }, [isLoading, vehicles]);
 
-  const pageNumbers = useMemo(() => {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }, [totalPages]);
-
   function resetFilters() {
     setSearch("");
     setSelectedCategoryId(null);
@@ -233,11 +210,11 @@ function HomePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <PageHero
         eyebrow="TransitView"
         title="Transpordi andmebaas"
-        description="Sirvi kinnitatud transpordikaarte, filtreeri tulemusi ja ava detailvaade koos fotodega."
+        description="Sirvi kinnitatud sõidukikaarte, fotosid ja ühistranspordi infot ühes kohas."
       />
 
       <PublicStatsSection stats={publicStats} isLoading={isStatsLoading} />
@@ -252,7 +229,7 @@ function HomePage() {
         createdTo={createdTo}
         categories={categories}
         counties={counties}
-        cities={cities}
+        cities={visibleCities}
         onSearchChange={setSearch}
         onCategoryChange={setSelectedCategoryId}
         onCountyChange={handleCountyChange}
@@ -263,63 +240,45 @@ function HomePage() {
         onReset={resetFilters}
       />
 
-      <section className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section>
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">
               Tulemused
             </p>
 
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">
               Saadaolevad sõidukid
             </h2>
           </div>
 
-          <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200">
+          <p className="text-sm font-semibold text-slate-500">
             Leitud kaarte:{" "}
-            <span className="font-bold text-slate-900">{vehicles.length}</span>
-            <span className="mx-2 text-slate-300">/</span>
-            Kokku:{" "}
-            <span className="font-bold text-slate-900">{totalVehicles}</span>
-          </div>
+            <span className="text-slate-900">{vehicles.length}</span> / Kokku:{" "}
+            <span className="text-slate-900">{totalVehicles}</span>
+          </p>
         </div>
 
         {isLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="overflow-hidden rounded-3xl bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
-              >
-                <div className="aspect-[16/10] animate-pulse bg-slate-200" />
-
-                <div className="space-y-3 p-5">
-                  <div className="h-6 animate-pulse rounded-xl bg-slate-200" />
-                  <div className="h-4 animate-pulse rounded-xl bg-slate-200" />
-                  <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
-                </div>
-              </div>
+                className="h-[420px] animate-pulse rounded-3xl bg-slate-200"
+              />
             ))}
           </div>
         ) : vehicles.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
-            {vehicles.map((vehicle, index) => (
-              <div
-                key={vehicle.vehicle_id}
-                className="animate-card-in"
-                style={{
-                  animationDelay: `${index * 50}ms`,
-                }}
-              >
-                <VehicleCard vehicle={vehicle} />
-              </div>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {vehicles.map((vehicle) => (
+              <VehicleCard key={vehicle.vehicle_id} vehicle={vehicle} />
             ))}
           </div>
         ) : (
-          <div className="rounded-[28px] bg-white px-6 py-10 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70">
-            <p className="text-lg font-semibold text-slate-800">
+          <div className="rounded-3xl bg-white px-6 py-14 text-center shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200">
+            <h3 className="text-xl font-bold text-slate-900">
               Sobivaid sõidukeid ei leitud
-            </p>
+            </h3>
 
             <p className="mt-2 text-sm text-slate-500">
               Muuda filtreid või proovi otsingut laiendada.
@@ -330,13 +289,13 @@ function HomePage() {
         {totalPages > 1 && (
           <div
             ref={paginationRef}
-            className="flex flex-wrap items-center justify-center gap-2 pt-2"
+            className="mt-8 flex flex-wrap items-center justify-center gap-2"
           >
             <button
               type="button"
               onClick={() => handlePageChange(page - 1)}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page === 1}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Eelmine
             </button>
@@ -359,8 +318,8 @@ function HomePage() {
             <button
               type="button"
               onClick={() => handlePageChange(page + 1)}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page === totalPages}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Järgmine
             </button>

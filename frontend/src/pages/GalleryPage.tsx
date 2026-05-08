@@ -6,11 +6,14 @@ import PublicStatsSection from "../components/ui/PublicStatsSection";
 import GalleryFilters from "../components/gallery/GalleryFilters";
 import GalleryPhotoCard from "../components/gallery/GalleryPhotoCard";
 import PhotoPreviewModal from "../components/modals/PhotoPreviewModal";
+
 import { getPublicPhotos } from "../config/photoApi";
-import { getCategories, getCities, getCounties } from "../config/referenceApi";
+import { getPublicFilters } from "../config/referenceApi";
 import { getPublicStats, type PublicStats } from "../config/statsApi";
+
 import { useToast } from "../hooks/useToast";
 import { useDebounce } from "../hooks/useDebounce";
+
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
 import type { GalleryPhoto } from "../types/gallery";
 import type { VehicleCondition } from "../types/vehicle";
@@ -19,6 +22,7 @@ function GalleryPage() {
   const { showToast } = useToast();
 
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [counties, setCounties] = useState<CountyItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -54,6 +58,14 @@ function GalleryPage() {
   const paginationRef = useRef<HTMLDivElement | null>(null);
   const shouldKeepPaginationVisibleRef = useRef(false);
 
+  const visibleCities = useMemo(() => {
+    if (!selectedCountyId) {
+      return cities;
+    }
+
+    return cities.filter((city) => city.county.county_id === selectedCountyId);
+  }, [cities, selectedCountyId]);
+
   const selectedPhotoIndex = selectedPhoto
     ? photos.findIndex((photo) => photo.photo_id === selectedPhoto.photo_id)
     : -1;
@@ -66,7 +78,7 @@ function GalleryPage() {
     try {
       setIsLoading(true);
 
-      const data = await getPublicPhotos<GalleryPhoto>({
+      const data = await getPublicPhotos({
         page,
         limit,
         regNumber: debouncedSearch || undefined,
@@ -88,7 +100,7 @@ function GalleryPage() {
         }
 
         const stillExists = data.items.find(
-          (photo) => photo.photo_id === currentPhoto.photo_id
+          (photo: GalleryPhoto) => photo.photo_id === currentPhoto.photo_id
         );
 
         return stillExists ?? null;
@@ -118,29 +130,25 @@ function GalleryPage() {
   ]);
 
   useEffect(() => {
-    async function loadReferenceData() {
+    async function loadPublicFilters() {
       try {
-        const [categoriesData, countiesData, citiesData] = await Promise.all([
-          getCategories(),
-          getCounties(),
-          getCities(),
-        ]);
+        const data = await getPublicFilters();
 
-        setCategories(categoriesData);
-        setCounties(countiesData);
-        setCities(citiesData);
+        setCategories(data.photoFilters.categories);
+        setCounties(data.photoFilters.counties);
+        setCities(data.photoFilters.cities);
       } catch (error) {
         console.error(error);
 
         showToast({
           variant: "error",
           title: "Andmete laadimine ebaõnnestus",
-          message: "Viiteandmeid ei õnnestunud laadida.",
+          message: "Avalike filtrite andmeid ei õnnestunud laadida.",
         });
       }
     }
 
-    loadReferenceData();
+    loadPublicFilters();
   }, [showToast]);
 
   useEffect(() => {
@@ -149,6 +157,7 @@ function GalleryPage() {
         setIsStatsLoading(true);
 
         const data = await getPublicStats();
+
         setPublicStats(data);
       } catch (error) {
         console.error(error);
@@ -165,38 +174,6 @@ function GalleryPage() {
 
     loadPublicStats();
   }, [showToast]);
-
-  useEffect(() => {
-    if (!selectedCountyId) {
-      getCities()
-        .then(setCities)
-        .catch((error) => {
-          console.error(error);
-
-          showToast({
-            variant: "error",
-            title: "Linnade laadimine ebaõnnestus",
-            message: "Linnade andmeid ei õnnestunud laadida.",
-          });
-        });
-
-      return;
-    }
-
-    setSelectedCityId(null);
-
-    getCities(selectedCountyId)
-      .then(setCities)
-      .catch((error) => {
-        console.error(error);
-
-        showToast({
-          variant: "error",
-          title: "Linnade laadimine ebaõnnestus",
-          message: "Linnade andmeid ei õnnestunud laadida.",
-        });
-      });
-  }, [selectedCountyId, showToast]);
 
   useEffect(() => {
     loadPhotos();
@@ -261,10 +238,12 @@ function GalleryPage() {
       (photo) => photo.photo_id === selectedPhoto.photo_id
     );
 
-    const previousIndex =
-      currentIndex <= 0 ? photos.length - 1 : currentIndex - 1;
+    const previousIndex = currentIndex <= 0 ? photos.length - 1 : currentIndex - 1;
+    const previousPhoto = photos[previousIndex];
 
-    setSelectedPhoto(photos[previousIndex]);
+    if (previousPhoto) {
+      setSelectedPhoto(previousPhoto);
+    }
   }
 
   function handleNextPhoto() {
@@ -276,18 +255,20 @@ function GalleryPage() {
       (photo) => photo.photo_id === selectedPhoto.photo_id
     );
 
-    const nextIndex =
-      currentIndex >= photos.length - 1 ? 0 : currentIndex + 1;
+    const nextIndex = currentIndex >= photos.length - 1 ? 0 : currentIndex + 1;
+    const nextPhoto = photos[nextIndex];
 
-    setSelectedPhoto(photos[nextIndex]);
+    if (nextPhoto) {
+      setSelectedPhoto(nextPhoto);
+    }
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <PageHero
         eyebrow="Galerii"
-        title="Fotogalerii"
-        description="Sirvi kinnitatud fotosid, filtreeri tulemusi sõiduki, asukoha ja lisamise kuupäeva järgi ning vaata fotosid suuremalt modaalaknas."
+        title="Transpordifotod"
+        description="Sirvi kinnitatud fotosid, leia sõiduk registrinumbri järgi ja vaata pildi detaile mugavas eelvaates."
       />
 
       <PublicStatsSection stats={publicStats} isLoading={isStatsLoading} />
@@ -302,7 +283,7 @@ function GalleryPage() {
         createdTo={createdTo}
         categories={categories}
         counties={counties}
-        cities={cities}
+        cities={visibleCities}
         onSearchChange={setSearch}
         onCategoryChange={setSelectedCategoryId}
         onCountyChange={handleCountyChange}
@@ -313,67 +294,53 @@ function GalleryPage() {
         onReset={resetFilters}
       />
 
-      <section className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section>
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">
               Tulemused
             </p>
 
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">
               Saadaolevad fotod
             </h2>
           </div>
 
-          <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200">
+          <p className="text-sm font-semibold text-slate-500">
             Leitud fotosid:{" "}
-            <span className="font-bold text-slate-900">{photos.length}</span>
-            <span className="mx-2 text-slate-300">/</span>
-            Kokku:{" "}
-            <span className="font-bold text-slate-900">{totalPhotos}</span>
-          </div>
+            <span className="text-slate-900">{photos.length}</span> / Kokku:{" "}
+            <span className="text-slate-900">{totalPhotos}</span>
+          </p>
         </div>
 
         {isLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="overflow-hidden rounded-3xl bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70"
-              >
-                <div className="aspect-[16/10] animate-pulse bg-slate-200" />
-
-                <div className="space-y-3 p-5">
-                  <div className="h-6 animate-pulse rounded-xl bg-slate-200" />
-                  <div className="h-4 animate-pulse rounded-xl bg-slate-200" />
-                  <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
-                </div>
-              </div>
+                className="h-[390px] animate-pulse rounded-3xl bg-slate-200"
+              />
             ))}
           </div>
         ) : photos.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
-            {photos.map((photo, index) => (
-              <div
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {photos.map((photo) => (
+              <GalleryPhotoCard
                 key={photo.photo_id}
-                className="animate-card-in"
-                style={{
-                  animationDelay: `${index * 50}ms`,
-                }}
-              >
-                <GalleryPhotoCard photo={photo} onPreview={setSelectedPhoto} />
-              </div>
+                photo={photo}
+                onPreview={setSelectedPhoto}
+              />
             ))}
           </div>
         ) : (
-          <div className="rounded-[28px] bg-white px-6 py-10 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-400">
-              <ImageIcon size={30} />
+          <div className="rounded-3xl bg-white px-6 py-14 text-center shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <ImageIcon size={28} />
             </div>
 
-            <p className="mt-5 text-lg font-semibold text-slate-800">
+            <h3 className="mt-5 text-xl font-bold text-slate-900">
               Sobivaid fotosid ei leitud
-            </p>
+            </h3>
 
             <p className="mt-2 text-sm text-slate-500">
               Muuda filtreid või proovi otsingut laiendada.
@@ -384,13 +351,13 @@ function GalleryPage() {
         {totalPages > 1 && (
           <div
             ref={paginationRef}
-            className="flex flex-wrap items-center justify-center gap-2 pt-2"
+            className="mt-8 flex flex-wrap items-center justify-center gap-2"
           >
             <button
               type="button"
               onClick={() => handlePageChange(page - 1)}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page === 1}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Eelmine
             </button>
@@ -413,8 +380,8 @@ function GalleryPage() {
             <button
               type="button"
               onClick={() => handlePageChange(page + 1)}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page === totalPages}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Järgmine
             </button>
@@ -423,9 +390,8 @@ function GalleryPage() {
       </section>
 
       <PhotoPreviewModal
-        isOpen={!!selectedPhoto}
+        isOpen={Boolean(selectedPhoto)}
         photo={selectedPhoto}
-        vehicle={selectedPhoto?.vehicle ?? null}
         photos={photos}
         currentIndex={selectedPhotoIndex >= 0 ? selectedPhotoIndex : 0}
         onClose={() => setSelectedPhoto(null)}
