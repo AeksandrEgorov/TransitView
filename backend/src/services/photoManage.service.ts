@@ -12,10 +12,13 @@ interface GetManagePhotosParams {
   page: number;
   limit: number;
   status?: ReviewStatus;
+  regNumber?: string;
   cityId?: number;
   countyId?: number;
   vehicleId?: number;
   authorId?: number;
+  categoryId?: number;
+  condition?: VehicleCondition;
   createdFrom?: Date;
   createdTo?: Date;
 }
@@ -260,10 +263,13 @@ export async function getManagePhotos(params: GetManagePhotosParams) {
     page,
     limit,
     status,
+    regNumber,
     cityId,
     countyId,
     vehicleId,
     authorId,
+    categoryId,
+    condition,
     createdFrom,
     createdTo,
   } = params;
@@ -273,6 +279,10 @@ export async function getManagePhotos(params: GetManagePhotosParams) {
 
   if (status) {
     filters.push(Prisma.sql`p.status = ${status}`);
+  }
+
+  if (regNumber) {
+    filters.push(Prisma.sql`p.reg_number ILIKE ${`%${regNumber}%`}`);
   }
 
   if (cityId) {
@@ -289,6 +299,14 @@ export async function getManagePhotos(params: GetManagePhotosParams) {
 
   if (authorId) {
     filters.push(Prisma.sql`p.author_id = ${authorId}`);
+  }
+
+  if (categoryId) {
+    filters.push(Prisma.sql`p.category_id = ${categoryId}`);
+  }
+
+  if (condition) {
+    filters.push(Prisma.sql`p.vehicle_condition = ${condition}`);
   }
 
   if (createdFrom) {

@@ -1,11 +1,18 @@
 export interface ManagePhotoListQuery {
-  page?: string;
-  limit?: string;
-  status?: "Ootel" | "Kinnitatud" | "Tagasi_lukatud";
-  cityId?: string;
-  countyId?: string;
-  vehicleId?: string;
-  authorId?: string;
-  createdFrom?: string;
-  createdTo?: string;
+  page?: string | string[];
+  limit?: string | string[];
+
+  status?: string | string[];
+  regNumber?: string | string[];
+
+  cityId?: string | string[];
+  countyId?: string | string[];
+  vehicleId?: string | string[];
+  authorId?: string | string[];
+  categoryId?: string | string[];
+
+  condition?: string | string[];
+
+  createdFrom?: string | string[];
+  createdTo?: string | string[];
 }

@@ -27,6 +27,13 @@ interface GetMyVehiclesParams {
   page: number;
   limit: number;
   status?: ReviewStatus;
+  regNumber?: string;
+  cityId?: number;
+  countyId?: number;
+  categoryId?: number;
+  condition?: string;
+  createdFrom?: Date;
+  createdTo?: Date;
 }
 
 interface CreateVehicleWithFirstPhotoData {
@@ -42,8 +49,8 @@ interface CreateVehicleWithFirstPhotoData {
     | "Maha_kantud"
     | "Müüdud"
     | "Teadmata";
-  city_id: number;
-  place: string;
+  city_id?: number | null;
+  place?: string | null;
   taken_at?: string | null;
   file_path: string;
   cloudinary_public_id?: string | null;
@@ -471,13 +478,66 @@ export async function getVehicleById(vehicleId: number) {
 }
 
 export async function getMyVehicles(params: GetMyVehiclesParams) {
-  const { userId, page, limit, status } = params;
-  const skip = (page - 1) * limit;
+  const {
+    userId,
+    page,
+    limit,
+    status,
+    regNumber,
+    cityId,
+    countyId,
+    categoryId,
+    condition,
+    createdFrom,
+    createdTo,
+  } = params;
 
+  const skip = (page - 1) * limit;
   const filters: Prisma.Sql[] = [Prisma.sql`v.created_by = ${userId}`];
 
   if (status) {
     filters.push(Prisma.sql`v.status = ${status}`);
+  }
+
+  if (regNumber) {
+    filters.push(Prisma.sql`v.reg_number ILIKE ${`%${regNumber}%`}`);
+  }
+
+  if (categoryId) {
+    filters.push(Prisma.sql`v.category_id = ${categoryId}`);
+  }
+
+  if (condition) {
+    filters.push(Prisma.sql`v.condition = ${condition}`);
+  }
+
+  if (createdFrom) {
+    filters.push(Prisma.sql`v.created_at >= ${createdFrom}`);
+  }
+
+  if (createdTo) {
+    filters.push(Prisma.sql`v.created_at <= ${createdTo}`);
+  }
+
+  if (cityId || countyId) {
+    const photoLocationFilters: Prisma.Sql[] = [];
+
+    if (cityId) {
+      photoLocationFilters.push(Prisma.sql`p.city_id = ${cityId}`);
+    }
+
+    if (countyId) {
+      photoLocationFilters.push(Prisma.sql`p.county_id = ${countyId}`);
+    }
+
+    filters.push(Prisma.sql`
+      EXISTS (
+        SELECT 1
+        FROM ${Prisma.raw(dbView("v_my_photos"))} p
+        WHERE p.vehicle_id = v.vehicle_id
+          AND ${Prisma.join(photoLocationFilters, " AND ")}
+      )
+    `);
   }
 
   const whereSql = Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`;
@@ -594,8 +654,8 @@ export async function createVehicleWithFirstPhoto(
       data: {
         vehicle_id: vehicle.vehicle_id,
         author_id: data.user_id,
-        city_id: data.city_id,
-        place: data.place,
+        city_id: data.city_id ?? null,
+        place: data.place ?? null,
         taken_at: data.taken_at ? new Date(data.taken_at) : null,
         file_path: data.file_path,
         cloudinary_public_id: data.cloudinary_public_id ?? null,

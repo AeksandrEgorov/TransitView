@@ -1,11 +1,10 @@
-export interface CreateUserBody {
-  username: string;
-  password: string;
-  role: "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";
-}
+export interface UserListQuery {
+  page?: string | string[];
+  limit?: string | string[];
 
-export interface UpdateUserBody {
-  username?: string;
-  password?: string;
-  role?: "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";
+  role?: string | string[];
+  search?: string | string[];
+
+  createdFrom?: string | string[];
+  createdTo?: string | string[];
 }

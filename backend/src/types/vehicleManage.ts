@@ -1,15 +1,19 @@
 export interface ManageVehicleListQuery {
-  page?: string;
-  limit?: string;
-  status?: "Ootel" | "Kinnitatud" | "Tagasi_lukatud";
-  regNumber?: string;
-  cityId?: string;
-  countyId?: string;
-  categoryId?: string;
-  modelId?: string;
-  companyId?: string;
-  branchId?: string;
-  condition?: string;
-  createdFrom?: string;
-  createdTo?: string;
+  page?: string | string[];
+  limit?: string | string[];
+
+  status?: string | string[];
+  regNumber?: string | string[];
+
+  cityId?: string | string[];
+  countyId?: string | string[];
+  categoryId?: string | string[];
+  modelId?: string | string[];
+  companyId?: string | string[];
+  branchId?: string | string[];
+
+  condition?: string | string[];
+
+  createdFrom?: string | string[];
+  createdTo?: string | string[];
 }

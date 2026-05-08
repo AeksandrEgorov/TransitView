@@ -1,14 +1,14 @@
 import prisma from "../config/prisma.js";
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma, UserRole } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
-
-type UserRoleValue = "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";
 
 interface GetUsersParams {
   page: number;
   limit: number;
-  role?: UserRoleValue;
+  role?: UserRole;
   search?: string;
+  createdFrom?: Date;
+  createdTo?: Date;
 }
 
 type CountRow = {
@@ -21,40 +21,44 @@ type AdminUserViewRow = {
   role: string;
   created_at: Date;
 
-  vehicles_count: number;
-  photos_count: number;
+  vehicles_count: number | bigint;
+  photos_count: number | bigint;
 
-  pending_vehicles_count: number;
-  confirmed_vehicles_count: number;
-  rejected_vehicles_count: number;
+  pending_vehicles_count: number | bigint;
+  confirmed_vehicles_count: number | bigint;
+  rejected_vehicles_count: number | bigint;
 
-  pending_photos_count: number;
-  confirmed_photos_count: number;
-  rejected_photos_count: number;
+  pending_photos_count: number | bigint;
+  confirmed_photos_count: number | bigint;
+  rejected_photos_count: number | bigint;
 };
+
+function toNumber(value: number | bigint | null | undefined) {
+  return Number(value ?? 0);
+}
 
 function mapAdminUserFromView(row: AdminUserViewRow) {
   return {
     user_id: row.user_id,
     username: row.username,
-    role: row.role as UserRoleValue,
+    role: row.role as UserRole,
     created_at: row.created_at,
 
-    vehicles_count: row.vehicles_count ?? 0,
-    photos_count: row.photos_count ?? 0,
+    vehicles_count: toNumber(row.vehicles_count),
+    photos_count: toNumber(row.photos_count),
 
-    pending_vehicles_count: row.pending_vehicles_count ?? 0,
-    confirmed_vehicles_count: row.confirmed_vehicles_count ?? 0,
-    rejected_vehicles_count: row.rejected_vehicles_count ?? 0,
+    pending_vehicles_count: toNumber(row.pending_vehicles_count),
+    confirmed_vehicles_count: toNumber(row.confirmed_vehicles_count),
+    rejected_vehicles_count: toNumber(row.rejected_vehicles_count),
 
-    pending_photos_count: row.pending_photos_count ?? 0,
-    confirmed_photos_count: row.confirmed_photos_count ?? 0,
-    rejected_photos_count: row.rejected_photos_count ?? 0,
+    pending_photos_count: toNumber(row.pending_photos_count),
+    confirmed_photos_count: toNumber(row.confirmed_photos_count),
+    rejected_photos_count: toNumber(row.rejected_photos_count),
   };
 }
 
 export async function getUsers(params: GetUsersParams) {
-  const { page, limit, role, search } = params;
+  const { page, limit, role, search, createdFrom, createdTo } = params;
 
   const skip = (page - 1) * limit;
   const filters: Prisma.Sql[] = [];
@@ -65,6 +69,14 @@ export async function getUsers(params: GetUsersParams) {
 
   if (search) {
     filters.push(Prisma.sql`u.username ILIKE ${`%${search}%`}`);
+  }
+
+  if (createdFrom) {
+    filters.push(Prisma.sql`u.created_at >= ${createdFrom}`);
+  }
+
+  if (createdTo) {
+    filters.push(Prisma.sql`u.created_at <= ${createdTo}`);
   }
 
   const whereSql =
@@ -127,7 +139,7 @@ export async function getUserByUsername(username: string) {
 export async function createUser(data: {
   username: string;
   password_hash: string;
-  role: UserRoleValue;
+  role: UserRole;
 }) {
   return prisma.users.create({
     data,
@@ -145,7 +157,7 @@ export async function updateUser(
   data: {
     username?: string;
     password_hash?: string;
-    role?: UserRoleValue;
+    role?: UserRole;
   }
 ) {
   return prisma.users.update({
