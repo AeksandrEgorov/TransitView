@@ -2,7 +2,10 @@ import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";
 import type { ManagePhotoListQuery } from "../types/photoManage.js";
-import { ReviewStatus } from "../generated/prisma/client.js";
+import {
+  ReviewStatus,
+  VehicleCondition,
+} from "../generated/prisma/client.js";
 import {
   approveManagePhoto,
   deleteManagePhoto,
@@ -16,19 +19,33 @@ import {
   updateManagePhotoSchema,
 } from "../validators/moderation.validator.js";
 
+function getSingleString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value) && typeof value[0] === "string") {
+    return value[0];
+  }
+
+  return undefined;
+}
+
 function parseDateQuery(
-  value: string | undefined,
+  value: unknown,
   endOfDay = false
 ): Date | null | undefined {
-  if (!value) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawValue);
 
   const date = isDateOnly
-    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
-    : new Date(value);
+    ? new Date(`${rawValue}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    : new Date(rawValue);
 
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -38,27 +55,45 @@ function parseDateQuery(
 }
 
 function parseReviewStatus(
-  value: string | undefined
+  value: unknown
 ): ReviewStatus | undefined | null {
-  if (!value) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  if (value === ReviewStatus.Ootel) return ReviewStatus.Ootel;
-  if (value === ReviewStatus.Kinnitatud) return ReviewStatus.Kinnitatud;
-  if (value === ReviewStatus.Tagasi_lukatud) {
-    return ReviewStatus.Tagasi_lukatud;
+  if (Object.values(ReviewStatus).includes(rawValue as ReviewStatus)) {
+    return rawValue as ReviewStatus;
   }
 
   return null;
 }
 
-function parseOptionalPositiveInt(value: string | undefined) {
-  if (!value) {
+function parseVehicleCondition(
+  value: unknown
+): VehicleCondition | undefined | null {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  const parsed = Number(value);
+  if (Object.values(VehicleCondition).includes(rawValue as VehicleCondition)) {
+    return rawValue as VehicleCondition;
+  }
+
+  return null;
+}
+
+function parseOptionalPositiveInt(value: unknown) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsed = Number(rawValue);
 
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return null;
@@ -96,8 +131,12 @@ export async function getManagePhotosHandler(
   try {
     const query = req.query as ManagePhotoListQuery;
 
-    const page = Math.max(Number(query.page) || 1, 1);
-    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
+    const page = Math.max(Number(getSingleString(query.page)) || 1, 1);
+
+    const limit = Math.min(
+      Math.max(Number(getSingleString(query.limit)) || 10, 1),
+      50
+    );
 
     const status = parseReviewStatus(query.status);
 
@@ -109,16 +148,28 @@ export async function getManagePhotosHandler(
       return;
     }
 
+    const condition = parseVehicleCondition(query.condition);
+
+    if (condition === null) {
+      res.status(400).json({
+        message:
+          "Invalid condition. Allowed values: Töökorras, Ei_tööta, Maha_kantud, Müüdud, Teadmata",
+      });
+      return;
+    }
+
     const cityId = parseOptionalPositiveInt(query.cityId);
     const countyId = parseOptionalPositiveInt(query.countyId);
     const vehicleId = parseOptionalPositiveInt(query.vehicleId);
     const authorId = parseOptionalPositiveInt(query.authorId);
+    const categoryId = parseOptionalPositiveInt(query.categoryId);
 
     if (
       cityId === null ||
       countyId === null ||
       vehicleId === null ||
-      authorId === null
+      authorId === null ||
+      categoryId === null
     ) {
       res.status(400).json({ message: "Invalid numeric query parameter" });
       return;
@@ -148,10 +199,13 @@ export async function getManagePhotosHandler(
       page,
       limit,
       status,
+      regNumber: getSingleString(query.regNumber)?.trim() || undefined,
       cityId,
       countyId,
       vehicleId,
       authorId,
+      categoryId,
+      condition,
       createdFrom,
       createdTo,
     });

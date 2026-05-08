@@ -19,7 +19,7 @@ interface GetManageVehiclesParams {
   modelId?: number;
   companyId?: number;
   branchId?: number;
-  condition?: string;
+  condition?: VehicleCondition;
   createdFrom?: Date;
   createdTo?: Date;
 }
@@ -249,7 +249,7 @@ function buildVehicleModerationData(params: {
   status?: ReviewStatus;
   reviewComment?: string | null;
   actorId: number;
-}) {
+}): Prisma.VehiclesUncheckedUpdateInput {
   const { status, reviewComment, actorId } = params;
 
   if (!status) {
@@ -429,20 +429,22 @@ export async function updateManageVehicle(
     actorId: data.actor_id,
   });
 
+  const updateData: Prisma.VehiclesUncheckedUpdateInput = {
+    ...(data.model_id !== undefined ? { model_id: data.model_id } : {}),
+    ...(data.branch_id !== undefined ? { branch_id: data.branch_id } : {}),
+    ...(data.reg_number !== undefined ? { reg_number: data.reg_number } : {}),
+    ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
+    ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
+    ...(data.chassis !== undefined ? { chassis: data.chassis } : {}),
+    ...(data.condition !== undefined ? { condition: data.condition } : {}),
+    ...moderationData,
+  };
+
   return prisma.vehicles.update({
     where: {
       vehicle_id: vehicleId,
     },
-    data: {
-      ...(data.model_id !== undefined ? { model_id: data.model_id } : {}),
-      ...(data.branch_id !== undefined ? { branch_id: data.branch_id } : {}),
-      ...(data.reg_number !== undefined ? { reg_number: data.reg_number } : {}),
-      ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
-      ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
-      ...(data.chassis !== undefined ? { chassis: data.chassis } : {}),
-      ...(data.condition !== undefined ? { condition: data.condition } : {}),
-      ...moderationData,
-    },
+    data: updateData,
     include: manageVehicleDetailInclude,
   });
 }

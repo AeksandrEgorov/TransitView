@@ -19,19 +19,33 @@ import {
   updateManageVehicleSchema,
 } from "../validators/moderation.validator.js";
 
+function getSingleString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value) && typeof value[0] === "string") {
+    return value[0];
+  }
+
+  return undefined;
+}
+
 function parseDateQuery(
-  value: string | undefined,
+  value: unknown,
   endOfDay = false
 ): Date | null | undefined {
-  if (!value) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawValue);
 
   const date = isDateOnly
-    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
-    : new Date(value);
+    ? new Date(`${rawValue}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    : new Date(rawValue);
 
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -41,45 +55,45 @@ function parseDateQuery(
 }
 
 function parseReviewStatus(
-  value: string | undefined
+  value: unknown
 ): ReviewStatus | undefined | null {
-  if (!value) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  if (value === ReviewStatus.Ootel) return ReviewStatus.Ootel;
-  if (value === ReviewStatus.Kinnitatud) return ReviewStatus.Kinnitatud;
-  if (value === ReviewStatus.Tagasi_lukatud) {
-    return ReviewStatus.Tagasi_lukatud;
+  if (Object.values(ReviewStatus).includes(rawValue as ReviewStatus)) {
+    return rawValue as ReviewStatus;
   }
 
   return null;
 }
 
 function parseVehicleCondition(
-  value: string | undefined
+  value: unknown
 ): VehicleCondition | undefined | null {
-  if (!value) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  if (value === VehicleCondition.Töökorras) return VehicleCondition.Töökorras;
-  if (value === VehicleCondition.Ei_tööta) return VehicleCondition.Ei_tööta;
-  if (value === VehicleCondition.Maha_kantud) {
-    return VehicleCondition.Maha_kantud;
+  if (Object.values(VehicleCondition).includes(rawValue as VehicleCondition)) {
+    return rawValue as VehicleCondition;
   }
-  if (value === VehicleCondition.Müüdud) return VehicleCondition.Müüdud;
-  if (value === VehicleCondition.Teadmata) return VehicleCondition.Teadmata;
 
   return null;
 }
 
-function parseOptionalPositiveInt(value: string | undefined) {
-  if (!value) {
+function parseOptionalPositiveInt(value: unknown) {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
     return undefined;
   }
 
-  const parsed = Number(value);
+  const parsed = Number(rawValue);
 
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return null;
@@ -135,8 +149,12 @@ export async function getManageVehiclesHandler(
   try {
     const query = req.query as ManageVehicleListQuery;
 
-    const page = Math.max(Number(query.page) || 1, 1);
-    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
+    const page = Math.max(Number(getSingleString(query.page)) || 1, 1);
+
+    const limit = Math.min(
+      Math.max(Number(getSingleString(query.limit)) || 10, 1),
+      50
+    );
 
     const status = parseReviewStatus(query.status);
 
@@ -201,7 +219,7 @@ export async function getManageVehiclesHandler(
       page,
       limit,
       status,
-      regNumber: query.regNumber?.trim() || undefined,
+      regNumber: getSingleString(query.regNumber)?.trim() || undefined,
       cityId,
       countyId,
       categoryId,

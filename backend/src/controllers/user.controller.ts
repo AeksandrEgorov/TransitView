@@ -2,6 +2,8 @@ import type { Response } from "express";
 import bcrypt from "bcrypt";
 
 import type { AuthRequest } from "../types/auth.js";
+import type { UserListQuery } from "../types/user.js";
+import { UserRole } from "../generated/prisma/client.js";
 import {
   createUser,
   deleteUser,
@@ -15,15 +17,6 @@ import {
   updateUserSchema,
 } from "../validators/user.validator.js";
 
-type UserRoleValue = "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";
-
-type UserListQuery = {
-  page?: string | string[];
-  limit?: string | string[];
-  role?: string | string[];
-  search?: string | string[];
-};
-
 function getSingleString(value: unknown): string | undefined {
   if (typeof value === "string") {
     return value;
@@ -36,20 +29,6 @@ function getSingleString(value: unknown): string | undefined {
   return undefined;
 }
 
-function parseUserRole(value: unknown): UserRoleValue | undefined | null {
-  const role = getSingleString(value);
-
-  if (!role) {
-    return undefined;
-  }
-
-  if (role === "Kasutaja") return "Kasutaja";
-  if (role === "Andmebaasi_toimetaja") return "Andmebaasi_toimetaja";
-  if (role === "Administraator") return "Administraator";
-
-  return null;
-}
-
 function parsePositiveId(value: unknown) {
   const rawValue = getSingleString(value);
   const id = Number(rawValue);
@@ -59,6 +38,43 @@ function parsePositiveId(value: unknown) {
   }
 
   return id;
+}
+
+function parseUserRole(value: unknown): UserRole | undefined | null {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  if (Object.values(UserRole).includes(rawValue as UserRole)) {
+    return rawValue as UserRole;
+  }
+
+  return null;
+}
+
+function parseDateQuery(
+  value: unknown,
+  endOfDay = false
+): Date | null | undefined {
+  const rawValue = getSingleString(value);
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawValue);
+
+  const date = isDateOnly
+    ? new Date(`${rawValue}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    : new Date(rawValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
 }
 
 function isPrismaNotFoundError(error: unknown) {
@@ -112,11 +128,33 @@ export async function getUsersHandler(
       return;
     }
 
+    const createdFrom = parseDateQuery(query.createdFrom);
+    const createdTo = parseDateQuery(query.createdTo, true);
+
+    if (createdFrom === null) {
+      res.status(400).json({ message: "Invalid createdFrom date format" });
+      return;
+    }
+
+    if (createdTo === null) {
+      res.status(400).json({ message: "Invalid createdTo date format" });
+      return;
+    }
+
+    if (createdFrom && createdTo && createdFrom > createdTo) {
+      res.status(400).json({
+        message: "createdFrom cannot be later than createdTo",
+      });
+      return;
+    }
+
     const result = await getUsers({
       page,
       limit,
       role,
       search: getSingleString(query.search)?.trim() || undefined,
+      createdFrom,
+      createdTo,
     });
 
     res.status(200).json(result);
@@ -169,7 +207,7 @@ export async function createUserHandler(
 
     const body = parsed.data;
 
-    if (body.role === "Administraator") {
+    if (body.role === UserRole.Administraator) {
       res.status(403).json({
         message: "Creating another administrator is not allowed",
       });
@@ -190,7 +228,7 @@ export async function createUserHandler(
     const user = await createUser({
       username: body.username,
       password_hash: passwordHash,
-      role: body.role,
+      role: body.role as UserRole,
     });
 
     res.status(201).json({
@@ -241,9 +279,16 @@ export async function updateUserHandler(
       return;
     }
 
-    if (body.role === "Administraator") {
+    if (body.role === UserRole.Administraator) {
       res.status(403).json({
         message: "Assigning administrator role is not allowed",
+      });
+      return;
+    }
+
+    if (req.user?.userId === userId && body.role !== undefined) {
+      res.status(400).json({
+        message: "You cannot change your own role",
       });
       return;
     }
@@ -262,7 +307,7 @@ export async function updateUserHandler(
     const updateData: {
       username?: string;
       password_hash?: string;
-      role?: UserRoleValue;
+      role?: UserRole;
     } = {};
 
     if (body.username !== undefined) {
@@ -270,11 +315,18 @@ export async function updateUserHandler(
     }
 
     if (body.role !== undefined) {
-      updateData.role = body.role;
+      updateData.role = body.role as UserRole;
     }
 
     if (body.password !== undefined) {
       updateData.password_hash = await bcrypt.hash(body.password, 10);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({
+        message: "No fields provided for update",
+      });
+      return;
     }
 
     const updatedUser = await updateUser(userId, updateData);
@@ -327,7 +379,7 @@ export async function deleteUserHandler(
       return;
     }
 
-    if (existingUser.role === "Administraator") {
+    if (existingUser.role === UserRole.Administraator) {
       res.status(403).json({
         message: "Administrator account cannot be deleted",
       });

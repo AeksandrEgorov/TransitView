@@ -26,6 +26,13 @@ interface GetMyPhotosParams {
   page: number;
   limit: number;
   status?: ReviewStatus;
+  regNumber?: string;
+  cityId?: number;
+  countyId?: number;
+  categoryId?: number;
+  condition?: VehicleCondition;
+  createdFrom?: Date;
+  createdTo?: Date;
 }
 
 interface CreatePhotoData {
@@ -116,6 +123,7 @@ type MyPhotoViewRow = {
   category_name: string;
 
   city_name: string | null;
+  county_id: number | null;
   county_name: string | null;
 
   author_username: string | null;
@@ -276,6 +284,7 @@ function mapMyPhotoFromView(row: MyPhotoViewRow) {
           city_id: row.city_id,
           name: row.city_name,
           county: {
+            county_id: row.county_id,
             name: row.county_name,
           },
         }
@@ -438,13 +447,53 @@ export async function getPhotosByVehicleId(params: {
 }
 
 export async function getMyPhotos(params: GetMyPhotosParams) {
-  const { userId, page, limit, status } = params;
-  const skip = (page - 1) * limit;
+  const {
+    userId,
+    page,
+    limit,
+    status,
+    regNumber,
+    cityId,
+    countyId,
+    categoryId,
+    condition,
+    createdFrom,
+    createdTo,
+  } = params;
 
+  const skip = (page - 1) * limit;
   const filters: Prisma.Sql[] = [Prisma.sql`p.author_id = ${userId}`];
 
   if (status) {
     filters.push(Prisma.sql`p.status = ${status}`);
+  }
+
+  if (regNumber) {
+    filters.push(Prisma.sql`p.reg_number ILIKE ${`%${regNumber}%`}`);
+  }
+
+  if (cityId) {
+    filters.push(Prisma.sql`p.city_id = ${cityId}`);
+  }
+
+  if (countyId) {
+    filters.push(Prisma.sql`p.county_id = ${countyId}`);
+  }
+
+  if (categoryId) {
+    filters.push(Prisma.sql`p.category_id = ${categoryId}`);
+  }
+
+  if (condition) {
+    filters.push(Prisma.sql`p.vehicle_condition = ${condition}`);
+  }
+
+  if (createdFrom) {
+    filters.push(Prisma.sql`p.created_at >= ${createdFrom}`);
+  }
+
+  if (createdTo) {
+    filters.push(Prisma.sql`p.created_at <= ${createdTo}`);
   }
 
   const whereSql = Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`;

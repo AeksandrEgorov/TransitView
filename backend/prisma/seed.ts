@@ -354,6 +354,7 @@ async function recreateDatabaseViews() {
       cat.name AS category_name,
 
       city.name AS city_name,
+      county.county_id,
       county.name AS county_name,
 
       author.username AS author_username
