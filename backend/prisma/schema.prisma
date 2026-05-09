@@ -34,9 +34,38 @@ enum VehicleCondition {
   @@schema("transitview")
 }
 
+model Users {
+  user_id       Int      @id @default(autoincrement())
+  username      String   @unique
+  email         String   @unique
+  password_hash String
+  role          UserRole @default(Kasutaja)
+  created_at    DateTime @default(now())
+
+  vehicles         Vehicles[] @relation("VehicleCreator")
+  reviewed_vehicles Vehicles[] @relation("VehicleReviewer")
+
+  photos          Photos[] @relation("PhotoAuthor")
+  reviewed_photos Photos[] @relation("PhotoReviewer")
+
+  created_cities Cities[] @relation("CityCreator")
+  reviewed_cities Cities[] @relation("CityReviewer")
+
+  created_models Models[] @relation("ModelCreator")
+  reviewed_models Models[] @relation("ModelReviewer")
+
+  created_companies Companies[] @relation("CompanyCreator")
+  reviewed_companies Companies[] @relation("CompanyReviewer")
+
+  created_branches Company_branches[] @relation("BranchCreator")
+  reviewed_branches Company_branches[] @relation("BranchReviewer")
+
+  @@schema("transitview")
+}
+
 model Counties {
   county_id Int    @id @default(autoincrement())
-  name      String @unique @db.VarChar(100)
+  name      String @unique
 
   cities Cities[]
 
@@ -44,46 +73,32 @@ model Counties {
 }
 
 model Cities {
-  city_id    Int    @id @default(autoincrement())
-  county_id  Int
-  name       String @db.VarChar(100)
+  city_id   Int @id @default(autoincrement())
+  county_id Int
+  name      String
 
-  county            Counties           @relation(fields: [county_id], references: [county_id], onDelete: Restrict, onUpdate: Cascade)
-  companies         Companies[]
-  company_branches  Company_branches[]
-  photos            Photos[]
+  status         ReviewStatus @default(Ootel)
+  created_by     Int?
+  reviewed_by    Int?
+  reviewed_at    DateTime?
+  review_comment String?
+
+  county Counties @relation(fields: [county_id], references: [county_id], onDelete: Restrict)
+
+  creator  Users? @relation("CityCreator", fields: [created_by], references: [user_id], onDelete: SetNull)
+  reviewer Users? @relation("CityReviewer", fields: [reviewed_by], references: [user_id], onDelete: SetNull)
+
+  companies Companies[]
+  branches  Company_branches[]
+  photos    Photos[]
 
   @@unique([county_id, name])
   @@schema("transitview")
 }
 
-model Companies {
-  company_id Int    @id @default(autoincrement())
-  city_id    Int
-  name       String @unique @db.VarChar(150)
-
-  city              Cities             @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
-  company_branches  Company_branches[]
-
-  @@schema("transitview")
-}
-
-model Company_branches {
-  branch_id    Int     @id @default(autoincrement())
-  company_id   Int
-  city_id      Int
-  branch_name  String? @db.VarChar(150)
-
-  company   Companies @relation(fields: [company_id], references: [company_id], onDelete: Restrict, onUpdate: Cascade)
-  city      Cities    @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
-  vehicles  Vehicles[]
-
-  @@schema("transitview")
-}
-
 model Categories {
   category_id Int    @id @default(autoincrement())
-  name        String @unique @db.VarChar(50)
+  name        String @unique
 
   models Models[]
 
@@ -91,77 +106,130 @@ model Categories {
 }
 
 model Models {
-  model_id      Int    @id @default(autoincrement())
-  category_id   Int
-  name          String @db.VarChar(100)
-  manufacturer  String @db.VarChar(100)
+  model_id     Int    @id @default(autoincrement())
+  category_id  Int
+  manufacturer String
+  name         String
 
-  category  Categories @relation(fields: [category_id], references: [category_id], onDelete: Restrict, onUpdate: Cascade)
-  vehicles  Vehicles[]
+  status         ReviewStatus @default(Ootel)
+  created_by     Int?
+  reviewed_by    Int?
+  reviewed_at    DateTime?
+  review_comment String?
 
-  @@unique([manufacturer, name])
+  category Categories @relation(fields: [category_id], references: [category_id], onDelete: Restrict)
+
+  creator  Users? @relation("ModelCreator", fields: [created_by], references: [user_id], onDelete: SetNull)
+  reviewer Users? @relation("ModelReviewer", fields: [reviewed_by], references: [user_id], onDelete: SetNull)
+
+  vehicles Vehicles[]
+
+  @@unique([category_id, manufacturer, name])
   @@schema("transitview")
 }
 
-model Users {
-  user_id        Int       @id @default(autoincrement())
-  username       String    @unique @db.VarChar(50)
-  password_hash  String    @db.Text
-  role           UserRole
-  created_at     DateTime  @default(now()) @db.Timestamp(6)
+model Companies {
+  company_id Int    @id @default(autoincrement())
+  name       String
+  city_id    Int?
 
-  created_vehicles   Vehicles[] @relation("VehicleCreatedBy")
-  reviewed_vehicles  Vehicles[] @relation("VehicleReviewedBy")
-  photos             Photos[]   @relation("PhotoAuthor")
+  status         ReviewStatus @default(Ootel)
+  created_by     Int?
+  reviewed_by    Int?
+  reviewed_at    DateTime?
+  review_comment String?
 
+  city Cities? @relation(fields: [city_id], references: [city_id], onDelete: SetNull)
+
+  creator  Users? @relation("CompanyCreator", fields: [created_by], references: [user_id], onDelete: SetNull)
+  reviewer Users? @relation("CompanyReviewer", fields: [reviewed_by], references: [user_id], onDelete: SetNull)
+
+  branches Company_branches[]
+
+  @@unique([name])
+  @@schema("transitview")
+}
+
+model Company_branches {
+  branch_id   Int    @id @default(autoincrement())
+  company_id  Int
+  city_id     Int
+  branch_name String
+
+  status         ReviewStatus @default(Ootel)
+  created_by     Int?
+  reviewed_by    Int?
+  reviewed_at    DateTime?
+  review_comment String?
+
+  company Companies @relation(fields: [company_id], references: [company_id], onDelete: Restrict)
+  city    Cities    @relation(fields: [city_id], references: [city_id], onDelete: Restrict)
+
+  creator  Users? @relation("BranchCreator", fields: [created_by], references: [user_id], onDelete: SetNull)
+  reviewer Users? @relation("BranchReviewer", fields: [reviewed_by], references: [user_id], onDelete: SetNull)
+
+  vehicles Vehicles[]
+
+  @@unique([company_id, city_id, branch_name])
   @@schema("transitview")
 }
 
 model Vehicles {
-  vehicle_id    Int               @id @default(autoincrement())
-  model_id      Int
-  branch_id     Int?
-  reg_number    String            @unique @db.VarChar(20)
-  vla_year      Int?              @db.SmallInt
-  vin_code      String?           @db.VarChar(30)
-  chassis       String?           @db.VarChar(100)
+  vehicle_id Int @id @default(autoincrement())
 
-  status        ReviewStatus
-  condition     VehicleCondition  @default(Teadmata)
+  model_id  Int
+  branch_id Int?
 
-  created_by    Int
-  reviewed_by   Int?
-  created_at    DateTime          @default(now()) @db.Timestamptz(6)
-  reviewed_at   DateTime?         @db.Timestamptz(6)
-  review_comment  String?         @db.Text
+  reg_number String  @unique
+  vla_year   Int?
+  vin_code   String?
+  chassis    String?
 
-  model         Models             @relation(fields: [model_id], references: [model_id], onDelete: Restrict, onUpdate: Cascade)
-  branch        Company_branches?  @relation(fields: [branch_id], references: [branch_id], onDelete: SetNull, onUpdate: Cascade)
-  creator       Users              @relation("VehicleCreatedBy", fields: [created_by], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
-  reviewer      Users?             @relation("VehicleReviewedBy", fields: [reviewed_by], references: [user_id], onDelete: SetNull, onUpdate: Cascade)
+  condition VehicleCondition @default(Teadmata)
 
-  photos        Photos[]
+  status         ReviewStatus @default(Ootel)
+  review_comment String?
+
+  created_by  Int
+  reviewed_by Int?
+  reviewed_at DateTime?
+  created_at  DateTime @default(now())
+
+  model  Models            @relation(fields: [model_id], references: [model_id], onDelete: Restrict)
+  branch Company_branches? @relation(fields: [branch_id], references: [branch_id], onDelete: SetNull)
+
+  creator  Users  @relation("VehicleCreator", fields: [created_by], references: [user_id], onDelete: Restrict)
+  reviewer Users? @relation("VehicleReviewer", fields: [reviewed_by], references: [user_id], onDelete: SetNull)
+
+  photos Photos[]
 
   @@schema("transitview")
 }
 
 model Photos {
-  photo_id              Int           @id @default(autoincrement())
-  vehicle_id            Int
-  author_id             Int
-  city_id               Int?
-  place                 String?       @db.VarChar(200)
-  taken_at              DateTime?     @db.Timestamptz(6)
-  file_path             String        @db.Text
-  cloudinary_public_id  String?
-  status                ReviewStatus
-  created_at            DateTime      @default(now()) @db.Timestamptz(6)
-  reviewed_at           DateTime?     @db.Timestamptz(6)
-  review_comment        String?       @db.Text
+  photo_id Int @id @default(autoincrement())
 
-  vehicle               Vehicles      @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade, onUpdate: Cascade)
-  author                Users         @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
-  city                  Cities?       @relation(fields: [city_id], references: [city_id], onDelete: Restrict, onUpdate: Cascade)
+  vehicle_id Int
+  author_id  Int
+  city_id    Int?
+
+  place    String?
+  taken_at DateTime?
+
+  file_path            String
+  cloudinary_public_id String?
+
+  status         ReviewStatus @default(Ootel)
+  review_comment String?
+  reviewed_by    Int?
+  reviewed_at    DateTime?
+  created_at     DateTime @default(now())
+
+  vehicle Vehicles @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
+  author  Users    @relation("PhotoAuthor", fields: [author_id], references: [user_id], onDelete: Restrict)
+
+  reviewer Users?  @relation("PhotoReviewer", fields: [reviewed_by], references: [user_id], onDelete: SetNull)
+  city     Cities? @relation(fields: [city_id], references: [city_id], onDelete: SetNull)
 
   @@schema("transitview")
 }

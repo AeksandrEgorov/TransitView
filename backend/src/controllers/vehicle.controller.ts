@@ -5,6 +5,7 @@ import {
   ReviewStatus,
   VehicleCondition,
 } from "../generated/prisma/client.js";
+
 import {
   approveVehicle,
   createVehicleWithFirstPhoto,
@@ -18,7 +19,9 @@ import {
   rejectVehicle,
   updateVehicle,
 } from "../services/vehicle.service.js";
+
 import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
+
 import {
   createVehicleSchema,
   updateVehicleSchema,
@@ -87,9 +90,7 @@ function parseDateQuery(
   return date;
 }
 
-function parseReviewStatus(
-  value: unknown
-): ReviewStatus | undefined | null {
+function parseReviewStatus(value: unknown): ReviewStatus | undefined | null {
   const rawValue = getSingleString(value);
 
   if (!rawValue) {
@@ -153,13 +154,20 @@ function isPrismaNotFoundError(error: unknown) {
   );
 }
 
+function isProtectedVehicleError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes("Kinnitatud sõidukit ei saa muuta") ||
+      error.message.includes("Kinnitatud sõidukit ei saa kustutada"))
+  );
+}
+
 export async function getVehicles(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -273,7 +281,6 @@ export async function getMyVehiclesHandler(
     }
 
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -283,8 +290,7 @@ export async function getMyVehiclesHandler(
 
     if (status === null) {
       res.status(400).json({
-        message:
-          "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
+        message: "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
       });
       return;
     }
@@ -515,11 +521,23 @@ export async function updateVehicleHandler(
 
     const updatedVehicle = await updateVehicle(vehicleId, parsed.data);
 
+    if (!updatedVehicle) {
+      res.status(404).json({ message: "Vehicle not found" });
+      return;
+    }
+
     res.status(200).json({
       message: "Vehicle updated successfully",
       vehicle: updatedVehicle,
     });
   } catch (error) {
+    if (isProtectedVehicleError(error)) {
+      res.status(403).json({
+        message: error instanceof Error ? error.message : "Forbidden",
+      });
+      return;
+    }
+
     if (isPrismaUniqueError(error)) {
       res.status(409).json({
         message: "Vehicle with this registration number already exists",
@@ -575,12 +593,24 @@ export async function deleteVehicleHandler(
       return;
     }
 
-    await deleteVehicle(vehicleId);
+    const deletedVehicle = await deleteVehicle(vehicleId);
+
+    if (!deletedVehicle) {
+      res.status(404).json({ message: "Vehicle not found" });
+      return;
+    }
 
     res.status(200).json({
       message: "Vehicle deleted successfully",
     });
   } catch (error) {
+    if (isProtectedVehicleError(error)) {
+      res.status(403).json({
+        message: error instanceof Error ? error.message : "Forbidden",
+      });
+      return;
+    }
+
     if (isPrismaNotFoundError(error)) {
       res.status(404).json({ message: "Vehicle not found" });
       return;
@@ -597,7 +627,6 @@ export async function getPendingVehiclesHandler(
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
