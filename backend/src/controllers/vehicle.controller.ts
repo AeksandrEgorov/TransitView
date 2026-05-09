@@ -1,11 +1,7 @@
 import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";
-import {
-  ReviewStatus,
-  VehicleCondition,
-} from "../generated/prisma/client.js";
-
+import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
 import {
   approveVehicle,
   createVehicleWithFirstPhoto,
@@ -19,9 +15,7 @@ import {
   rejectVehicle,
   updateVehicle,
 } from "../services/vehicle.service.js";
-
 import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
-
 import {
   createVehicleSchema,
   updateVehicleSchema,
@@ -168,6 +162,7 @@ export async function getVehicles(
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
+
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -281,6 +276,7 @@ export async function getMyVehiclesHandler(
     }
 
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
+
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -290,7 +286,8 @@ export async function getMyVehiclesHandler(
 
     if (status === null) {
       res.status(400).json({
-        message: "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
+        message:
+          "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
       });
       return;
     }
@@ -375,9 +372,7 @@ export async function getMyVehicleHandler(
     const vehicle = await getMyVehicleById(vehicleId, req.user.userId);
 
     if (!vehicle) {
-      res.status(404).json({
-        message: "Vehicle not found or you do not have access to it",
-      });
+      res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
@@ -400,7 +395,7 @@ export async function createVehicleHandler(
 
     if (!req.file) {
       res.status(400).json({
-        message: "At least one image is required to create a vehicle card",
+        message: "Vehicle first photo is required",
       });
       return;
     }
@@ -415,42 +410,49 @@ export async function createVehicleHandler(
       return;
     }
 
-    const {
-      model_id,
-      branch_id,
-      reg_number,
-      vla_year,
-      vin_code,
-      chassis,
-      condition,
-      city_id,
-      place,
-      taken_at,
-    } = parsed.data;
+    const body = parsed.data;
 
-    const uploadedImage = await uploadBufferToCloudinary(
-      req.file.buffer,
-      "transitview"
-    );
+    const uploadedImage = await uploadBufferToCloudinary(req.file.buffer);
 
     const result = await createVehicleWithFirstPhoto({
-      model_id,
-      branch_id,
-      reg_number,
-      vla_year,
-      vin_code,
-      chassis,
-      condition,
-      city_id,
-      place,
-      taken_at,
+      model_id: body.model_id,
+      new_model_manufacturer: body.new_model_manufacturer,
+      new_model_name: body.new_model_name,
+      new_model_category_id: body.new_model_category_id,
+
+      branch_id: body.branch_id,
+      new_branch_name: body.new_branch_name,
+
+      new_branch_company_id: body.new_branch_company_id,
+
+      new_company_name: body.new_company_name,
+      new_company_city_id: body.new_company_city_id,
+      new_company_city_name: body.new_company_city_name,
+      new_company_city_county_id: body.new_company_city_county_id,
+
+      new_branch_city_id: body.new_branch_city_id,
+      new_branch_city_name: body.new_branch_city_name,
+      new_branch_city_county_id: body.new_branch_city_county_id,
+
+      reg_number: body.reg_number,
+      vla_year: body.vla_year,
+      vin_code: body.vin_code,
+      chassis: body.chassis,
+      condition: body.condition,
+
+      city_id: body.city_id,
+      new_city_name: body.new_city_name,
+      new_city_county_id: body.new_city_county_id,
+
+      place: body.place,
+      taken_at: body.taken_at,
       file_path: uploadedImage.secure_url,
       cloudinary_public_id: uploadedImage.public_id,
       user_id: req.user.userId,
     });
 
     res.status(201).json({
-      message: "Vehicle card created successfully with first photo",
+      message: "Vehicle created successfully",
       ...result,
     });
   } catch (error) {
@@ -500,35 +502,31 @@ export async function updateVehicleHandler(
       return;
     }
 
-    const vehicle = await getVehicleForEdit(vehicleId);
+    const existingVehicle = await getVehicleForEdit(vehicleId);
+
+    if (!existingVehicle) {
+      res.status(404).json({ message: "Vehicle not found" });
+      return;
+    }
+
+    if (!isHigherRole(req) && existingVehicle.created_by !== req.user.userId) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    const vehicle = await updateVehicle(vehicleId, {
+      ...parsed.data,
+      user_id: req.user.userId,
+    });
 
     if (!vehicle) {
       res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
-    const isOwner = vehicle.created_by === req.user.userId;
-
-    const ownerCanEdit =
-      isOwner &&
-      (vehicle.status === ReviewStatus.Ootel ||
-        vehicle.status === ReviewStatus.Tagasi_lukatud);
-
-    if (!isHigherRole(req) && !ownerCanEdit) {
-      res.status(403).json({ message: "You cannot edit this vehicle" });
-      return;
-    }
-
-    const updatedVehicle = await updateVehicle(vehicleId, parsed.data);
-
-    if (!updatedVehicle) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
     res.status(200).json({
       message: "Vehicle updated successfully",
-      vehicle: updatedVehicle,
+      vehicle,
     });
   } catch (error) {
     if (isProtectedVehicleError(error)) {
@@ -549,6 +547,11 @@ export async function updateVehicleHandler(
       res.status(400).json({
         message: "Invalid related record id",
       });
+      return;
+    }
+
+    if (isPrismaNotFoundError(error)) {
+      res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
@@ -574,22 +577,15 @@ export async function deleteVehicleHandler(
       return;
     }
 
-    const vehicle = await getVehicleForEdit(vehicleId);
+    const existingVehicle = await getVehicleForEdit(vehicleId);
 
-    if (!vehicle) {
+    if (!existingVehicle) {
       res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
-    const isOwner = vehicle.created_by === req.user.userId;
-
-    const ownerCanDelete =
-      isOwner &&
-      (vehicle.status === ReviewStatus.Ootel ||
-        vehicle.status === ReviewStatus.Tagasi_lukatud);
-
-    if (!isHigherRole(req) && !ownerCanDelete) {
-      res.status(403).json({ message: "You cannot delete this vehicle" });
+    if (!isHigherRole(req) && existingVehicle.created_by !== req.user.userId) {
+      res.status(403).json({ message: "Forbidden" });
       return;
     }
 
@@ -611,11 +607,6 @@ export async function deleteVehicleHandler(
       return;
     }
 
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
     console.error("Delete vehicle error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
@@ -627,12 +618,16 @@ export async function getPendingVehiclesHandler(
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
+
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
     );
 
-    const result = await getPendingVehicles({ page, limit });
+    const result = await getPendingVehicles({
+      page,
+      limit,
+    });
 
     res.status(200).json(result);
   } catch (error) {

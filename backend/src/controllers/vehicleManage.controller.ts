@@ -1,10 +1,7 @@
-import type { Response } from "express";
-
-import type { AuthRequest } from "../types/auth.js";
-import type { ManageVehicleListQuery } from "../types/vehicleManage.js";
+import type { NextFunction, Request, Response } from "express";
 import {
   ReviewStatus,
-  VehicleCondition,
+  type VehicleCondition,
 } from "../generated/prisma/client.js";
 import {
   approveManageVehicle,
@@ -14,428 +11,368 @@ import {
   rejectManageVehicle,
   updateManageVehicle,
 } from "../services/vehicleManage.service.js";
-import {
-  rejectSchema,
-  updateManageVehicleSchema,
-} from "../validators/moderation.validator.js";
 
-function getSingleString(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    return value;
-  }
+type AuthenticatedRequest = Request & {
+  user?: {
+    user_id?: number;
+    id?: number;
+    userId?: number;
+  };
+};
 
-  if (Array.isArray(value) && typeof value[0] === "string") {
-    return value[0];
-  }
-
-  return undefined;
-}
-
-function parseDateQuery(
-  value: unknown,
-  endOfDay = false
-): Date | null | undefined {
-  const rawValue = getSingleString(value);
-
-  if (!rawValue) {
+function parseNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") {
     return undefined;
   }
 
-  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawValue);
+  const parsed = Number(value);
 
-  const date = isDateOnly
-    ? new Date(`${rawValue}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
-    : new Date(rawValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date;
-}
-
-function parseReviewStatus(value: unknown): ReviewStatus | undefined | null {
-  const rawValue = getSingleString(value);
-
-  if (!rawValue) {
+  if (!Number.isFinite(parsed)) {
     return undefined;
-  }
-
-  if (Object.values(ReviewStatus).includes(rawValue as ReviewStatus)) {
-    return rawValue as ReviewStatus;
-  }
-
-  return null;
-}
-
-function parseVehicleCondition(
-  value: unknown
-): VehicleCondition | undefined | null {
-  const rawValue = getSingleString(value);
-
-  if (!rawValue) {
-    return undefined;
-  }
-
-  if (Object.values(VehicleCondition).includes(rawValue as VehicleCondition)) {
-    return rawValue as VehicleCondition;
-  }
-
-  return null;
-}
-
-function parseOptionalPositiveInt(value: unknown) {
-  const rawValue = getSingleString(value);
-
-  if (!rawValue) {
-    return undefined;
-  }
-
-  const parsed = Number(rawValue);
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return null;
   }
 
   return parsed;
 }
 
-function getAuthenticatedUserId(req: AuthRequest, res: Response) {
-  if (!req.user) {
-    res.status(401).json({ message: "Authentication required" });
+function parsePositiveNumber(value: unknown, fallback: number) {
+  const parsed = parseNumber(value);
+
+  if (!parsed || parsed < 1) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
+}
+
+function parseDate(value: unknown, endOfDay = false) {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date;
+}
+
+function parseReviewStatus(value: unknown) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === ReviewStatus.Ootel) {
+    return ReviewStatus.Ootel;
+  }
+
+  if (value === ReviewStatus.Kinnitatud) {
+    return ReviewStatus.Kinnitatud;
+  }
+
+  if (value === ReviewStatus.Tagasi_lukatud) {
+    return ReviewStatus.Tagasi_lukatud;
+  }
+
+  return undefined;
+}
+
+function parseVehicleCondition(value: unknown) {
+  if (!value) {
+    return undefined;
+  }
+
+  return String(value) as VehicleCondition;
+}
+
+function getActorId(req: AuthenticatedRequest) {
+  const actorId = Number(
+    req.user?.user_id ?? req.user?.id ?? req.user?.userId
+  );
+
+  if (!Number.isFinite(actorId) || actorId < 1) {
     return null;
   }
 
-  return req.user.userId;
-}
-
-function isPrismaNotFoundError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2025"
-  );
-}
-
-function isPrismaUniqueError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2002"
-  );
-}
-
-function isPrismaForeignKeyError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2003"
-  );
-}
-
-function isRejectCommentError(error: unknown) {
-  return error instanceof Error && error.message === "Reject comment is required";
-}
-
-function isProtectedVehicleError(error: unknown) {
-  return (
-    error instanceof Error &&
-    error.message.includes("Kinnitatud sõidukit ei saa kustutada")
-  );
+  return actorId;
 }
 
 export async function getManageVehiclesHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const query = req.query as ManageVehicleListQuery;
+    const page = parsePositiveNumber(req.query.page, 1);
+    const limit = parsePositiveNumber(req.query.limit, 10);
 
-    const page = Math.max(Number(getSingleString(query.page)) || 1, 1);
-
-    const limit = Math.min(
-      Math.max(Number(getSingleString(query.limit)) || 10, 1),
-      50
-    );
-
-    const status = parseReviewStatus(query.status);
-
-    if (status === null) {
-      res.status(400).json({
-        message:
-          "Invalid status. Allowed values: Ootel, Kinnitatud, Tagasi_lukatud",
-      });
-      return;
-    }
-
-    const condition = parseVehicleCondition(query.condition);
-
-    if (condition === null) {
-      res.status(400).json({
-        message:
-          "Invalid condition. Allowed values: Töökorras, Ei_tööta, Maha_kantud, Müüdud, Teadmata",
-      });
-      return;
-    }
-
-    const createdBy = parseOptionalPositiveInt(query.createdBy);
-
-    const cityId = parseOptionalPositiveInt(query.cityId);
-    const countyId = parseOptionalPositiveInt(query.countyId);
-    const categoryId = parseOptionalPositiveInt(query.categoryId);
-    const modelId = parseOptionalPositiveInt(query.modelId);
-    const companyId = parseOptionalPositiveInt(query.companyId);
-    const branchId = parseOptionalPositiveInt(query.branchId);
-
-    if (
-      createdBy === null ||
-      cityId === null ||
-      countyId === null ||
-      categoryId === null ||
-      modelId === null ||
-      companyId === null ||
-      branchId === null
-    ) {
-      res.status(400).json({ message: "Invalid numeric query parameter" });
-      return;
-    }
-
-    const createdFrom = parseDateQuery(query.createdFrom);
-    const createdTo = parseDateQuery(query.createdTo, true);
-
-    if (createdFrom === null) {
-      res.status(400).json({ message: "Invalid createdFrom date format" });
-      return;
-    }
-
-    if (createdTo === null) {
-      res.status(400).json({ message: "Invalid createdTo date format" });
-      return;
-    }
-
-    if (createdFrom && createdTo && createdFrom > createdTo) {
-      res.status(400).json({
-        message: "createdFrom cannot be later than createdTo",
-      });
-      return;
-    }
-
-    const result = await getManageVehicles({
+    const data = await getManageVehicles({
       page,
       limit,
-      status,
-      regNumber: getSingleString(query.regNumber)?.trim() || undefined,
-      createdBy,
-      cityId,
-      countyId,
-      categoryId,
-      modelId,
-      companyId,
-      branchId,
-      condition,
-      createdFrom,
-      createdTo,
+
+      status: parseReviewStatus(req.query.status),
+      regNumber: req.query.regNumber ? String(req.query.regNumber) : undefined,
+
+      createdBy: parseNumber(req.query.createdBy),
+      creatorId:
+        parseNumber(req.query.creatorId) ??
+        parseNumber(req.query.userId) ??
+        parseNumber(req.query.created_by),
+
+      cityId: parseNumber(req.query.cityId),
+      countyId: parseNumber(req.query.countyId),
+      categoryId: parseNumber(req.query.categoryId),
+      modelId: parseNumber(req.query.modelId),
+      companyId: parseNumber(req.query.companyId),
+      branchId: parseNumber(req.query.branchId),
+
+      condition: parseVehicleCondition(req.query.condition),
+
+      createdFrom: parseDate(req.query.createdFrom),
+      createdTo: parseDate(req.query.createdTo, true),
     });
 
-    res.status(200).json(result);
+    res.json(data);
   } catch (error) {
-    console.error("Get manage vehicles error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 }
 
 export async function getManageVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
     const vehicleId = Number(req.params.id);
 
-    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-      res.status(400).json({ message: "Invalid vehicle id" });
+    if (!Number.isFinite(vehicleId)) {
+      res.status(400).json({
+        message: "Invalid vehicle id",
+      });
       return;
     }
 
     const vehicle = await getManageVehicleById(vehicleId);
 
     if (!vehicle) {
-      res.status(404).json({ message: "Vehicle not found" });
+      res.status(404).json({
+        message: "Vehicle not found",
+      });
       return;
     }
 
-    res.status(200).json(vehicle);
+    res.json(vehicle);
   } catch (error) {
-    console.error("Get manage vehicle error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 }
 
 export async function updateManageVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const actorId = getAuthenticatedUserId(req, res);
+    const vehicleId = Number(req.params.id);
+    const actorId = getActorId(req);
+
+    if (!Number.isFinite(vehicleId)) {
+      res.status(400).json({
+        message: "Invalid vehicle id",
+      });
+      return;
+    }
 
     if (!actorId) {
-      return;
-    }
-
-    const vehicleId = Number(req.params.id);
-
-    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-      res.status(400).json({ message: "Invalid vehicle id" });
-      return;
-    }
-
-    const parsed = updateManageVehicleSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
+      res.status(401).json({
+        message: "Unauthorized",
       });
       return;
     }
 
     const vehicle = await updateManageVehicle(vehicleId, {
-      ...parsed.data,
+      model_id:
+        req.body.model_id !== undefined && req.body.model_id !== ""
+          ? Number(req.body.model_id)
+          : undefined,
+
+      new_model_manufacturer: req.body.new_model_manufacturer,
+      new_model_name: req.body.new_model_name,
+      new_model_category_id:
+        req.body.new_model_category_id !== undefined &&
+        req.body.new_model_category_id !== ""
+          ? Number(req.body.new_model_category_id)
+          : undefined,
+
+      branch_id:
+        req.body.branch_id !== undefined
+          ? req.body.branch_id === null || req.body.branch_id === ""
+            ? null
+            : Number(req.body.branch_id)
+          : undefined,
+
+      new_branch_name: req.body.new_branch_name,
+
+      new_branch_company_id:
+        req.body.new_branch_company_id !== undefined &&
+        req.body.new_branch_company_id !== ""
+          ? Number(req.body.new_branch_company_id)
+          : undefined,
+
+      new_company_name: req.body.new_company_name,
+
+      new_company_city_id:
+        req.body.new_company_city_id !== undefined &&
+        req.body.new_company_city_id !== ""
+          ? Number(req.body.new_company_city_id)
+          : undefined,
+
+      new_company_city_name: req.body.new_company_city_name,
+
+      new_company_city_county_id:
+        req.body.new_company_city_county_id !== undefined &&
+        req.body.new_company_city_county_id !== ""
+          ? Number(req.body.new_company_city_county_id)
+          : undefined,
+
+      new_branch_city_id:
+        req.body.new_branch_city_id !== undefined &&
+        req.body.new_branch_city_id !== ""
+          ? Number(req.body.new_branch_city_id)
+          : undefined,
+
+      new_branch_city_name: req.body.new_branch_city_name,
+
+      new_branch_city_county_id:
+        req.body.new_branch_city_county_id !== undefined &&
+        req.body.new_branch_city_county_id !== ""
+          ? Number(req.body.new_branch_city_county_id)
+          : undefined,
+
+      reg_number: req.body.reg_number,
+
+      vla_year:
+        req.body.vla_year !== undefined
+          ? req.body.vla_year === null || req.body.vla_year === ""
+            ? null
+            : Number(req.body.vla_year)
+          : undefined,
+
+      vin_code: req.body.vin_code,
+      chassis: req.body.chassis,
+      condition: req.body.condition,
+
       actor_id: actorId,
     });
 
-    res.status(200).json({
+    res.json({
       message: "Vehicle updated successfully",
       vehicle,
     });
   } catch (error) {
-    if (isRejectCommentError(error)) {
-      res.status(400).json({
-        message: "review_comment is required when rejecting vehicle",
-      });
-      return;
-    }
-
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    if (isPrismaUniqueError(error)) {
-      res.status(409).json({
-        message: "Vehicle with this registration number already exists",
-      });
-      return;
-    }
-
-    if (isPrismaForeignKeyError(error)) {
-      res.status(400).json({
-        message: "Invalid related record id",
-      });
-      return;
-    }
-
-    console.error("Update manage vehicle error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 }
 
 export async function deleteManageVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
     const vehicleId = Number(req.params.id);
 
-    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-      res.status(400).json({ message: "Invalid vehicle id" });
+    if (!Number.isFinite(vehicleId)) {
+      res.status(400).json({
+        message: "Invalid vehicle id",
+      });
       return;
     }
 
     const deletedVehicle = await deleteManageVehicle(vehicleId);
 
     if (!deletedVehicle) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    res.status(200).json({
-      message: "Vehicle deleted successfully",
-    });
-  } catch (error) {
-    if (isProtectedVehicleError(error)) {
-      res.status(403).json({
-        message: error instanceof Error ? error.message : "Forbidden",
+      res.status(404).json({
+        message: "Vehicle not found",
       });
       return;
     }
 
-    console.error("Delete manage vehicle error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.json({
+      message: "Vehicle deleted successfully",
+      vehicle: deletedVehicle,
+    });
+  } catch (error) {
+    next(error);
   }
 }
 
 export async function approveManageVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const actorId = getAuthenticatedUserId(req, res);
+    const vehicleId = Number(req.params.id);
+    const actorId = getActorId(req);
 
-    if (!actorId) {
+    if (!Number.isFinite(vehicleId)) {
+      res.status(400).json({
+        message: "Invalid vehicle id",
+      });
       return;
     }
 
-    const vehicleId = Number(req.params.id);
-
-    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-      res.status(400).json({ message: "Invalid vehicle id" });
+    if (!actorId) {
+      res.status(401).json({
+        message: "Unauthorized",
+      });
       return;
     }
 
     const vehicle = await approveManageVehicle(vehicleId, actorId);
 
-    res.status(200).json({
-      message: "Vehicle approved successfully",
-      vehicle,
-    });
+    res.json(vehicle);
   } catch (error) {
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    console.error("Approve manage vehicle error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 }
 
 export async function rejectManageVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const actorId = getAuthenticatedUserId(req, res);
+    const vehicleId = Number(req.params.id);
+    const actorId = getActorId(req);
+
+    const reviewComment =
+      req.body.review_comment ?? req.body.reviewComment ?? req.body.comment;
+
+    if (!Number.isFinite(vehicleId)) {
+      res.status(400).json({
+        message: "Invalid vehicle id",
+      });
+      return;
+    }
 
     if (!actorId) {
+      res.status(401).json({
+        message: "Unauthorized",
+      });
       return;
     }
 
-    const vehicleId = Number(req.params.id);
-
-    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-      res.status(400).json({ message: "Invalid vehicle id" });
-      return;
-    }
-
-    const parsed = rejectSchema.safeParse(req.body);
-
-    if (!parsed.success) {
+    if (!reviewComment || !String(reviewComment).trim()) {
       res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
+        message: "Reject comment is required",
       });
       return;
     }
@@ -443,27 +380,11 @@ export async function rejectManageVehicleHandler(
     const vehicle = await rejectManageVehicle(
       vehicleId,
       actorId,
-      parsed.data.review_comment
+      String(reviewComment)
     );
 
-    res.status(200).json({
-      message: "Vehicle rejected successfully",
-      vehicle,
-    });
+    res.json(vehicle);
   } catch (error) {
-    if (isRejectCommentError(error)) {
-      res.status(400).json({
-        message: "review_comment is required when rejecting vehicle",
-      });
-      return;
-    }
-
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    console.error("Reject manage vehicle error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 }

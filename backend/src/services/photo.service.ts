@@ -746,6 +746,12 @@ export async function updatePhoto(photoId: number, data: UpdatePhotoData) {
       },
     });
 
+    if (nextCityId !== undefined && oldPhoto.city_id !== nextCityId) {
+      await cleanupUnusedPhotoReferences(tx, {
+        city_id: oldPhoto.city_id,
+      });
+    }
+
     const imageWasReplaced =
       data.cloudinary_public_id &&
       oldPhoto.cloudinary_public_id &&

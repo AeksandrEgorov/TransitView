@@ -27,7 +27,7 @@ app.use("/api/manage/vehicles", vehicleManageRoutes);
 app.use("/api/photos", photoRoutes);
 app.use("/api/manage/photos", photoManageRoutes);
 app.use("/api/reference", referenceRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/manage/users", userRoutes);
 app.use("/api/stats", statsRoutes);
 
 const PORT = process.env.PORT || 5000;

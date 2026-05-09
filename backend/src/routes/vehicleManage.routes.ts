@@ -2,12 +2,16 @@ import { Router } from "express";
 
 import {
   approveManageVehicleHandler,
-  deleteManageVehicleHandler,
   getManageVehicleHandler,
   getManageVehiclesHandler,
   rejectManageVehicleHandler,
-  updateManageVehicleHandler,
 } from "../controllers/vehicleManage.controller.js";
+
+import {
+  deleteVehicleHandler,
+  updateVehicleHandler,
+} from "../controllers/vehicle.controller.js";
+
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
 
@@ -19,8 +23,8 @@ router.use(requireRole("Andmebaasi_toimetaja", "Administraator"));
 router.get("/", getManageVehiclesHandler);
 router.get("/:id", getManageVehicleHandler);
 
-router.patch("/:id", updateManageVehicleHandler);
-router.delete("/:id", deleteManageVehicleHandler);
+router.patch("/:id", updateVehicleHandler);
+router.delete("/:id", deleteVehicleHandler);
 
 router.patch("/:id/approve", approveManageVehicleHandler);
 router.patch("/:id/reject", rejectManageVehicleHandler);
