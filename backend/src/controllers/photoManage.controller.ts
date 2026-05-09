@@ -356,7 +356,7 @@ export async function approveManagePhotoHandler(
       return;
     }
 
-    const photo = await approveManagePhoto(photoId);
+    const photo = await approveManagePhoto(photoId, req.user?.userId);
 
     res.status(200).json({
       message: "Photo approved successfully",
@@ -395,7 +395,11 @@ export async function rejectManagePhotoHandler(
       return;
     }
 
-    const photo = await rejectManagePhoto(photoId, parsed.data.review_comment);
+    const photo = await rejectManagePhoto(
+      photoId,
+      parsed.data.review_comment,
+      req.user?.userId
+    );
 
     res.status(200).json({
       message: "Photo rejected successfully",

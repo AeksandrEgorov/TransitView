@@ -4,7 +4,6 @@ import {
   ReviewStatus,
   type VehicleCondition,
 } from "../generated/prisma/client.js";
-import type { UpdateVehicleBody } from "../types/vehicle.js";
 import { dbView } from "../utils/dbView.js";
 import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 import { cleanupUnusedVehicleReferences } from "./referenceCleanup.service.js";
@@ -39,8 +38,25 @@ interface GetMyVehiclesParams {
 }
 
 interface CreateVehicleWithFirstPhotoData {
-  model_id: number;
+  model_id?: number | null;
+  new_model_manufacturer?: string | null;
+  new_model_name?: string | null;
+  new_model_category_id?: number | null;
+
   branch_id?: number | null;
+  new_branch_name?: string | null;
+
+  new_branch_company_id?: number | null;
+
+  new_company_name?: string | null;
+  new_company_city_id?: number | null;
+  new_company_city_name?: string | null;
+  new_company_city_county_id?: number | null;
+
+  new_branch_city_id?: number | null;
+  new_branch_city_name?: string | null;
+  new_branch_city_county_id?: number | null;
+
   reg_number: string;
   vla_year?: number | null;
   vin_code?: string | null;
@@ -51,11 +67,49 @@ interface CreateVehicleWithFirstPhotoData {
     | "Maha_kantud"
     | "Müüdud"
     | "Teadmata";
+
   city_id?: number | null;
+  new_city_name?: string | null;
+  new_city_county_id?: number | null;
+
   place?: string | null;
   taken_at?: string | null;
   file_path: string;
   cloudinary_public_id?: string | null;
+  user_id: number;
+}
+
+interface UpdateVehicleData {
+  model_id?: number | null;
+  new_model_manufacturer?: string | null;
+  new_model_name?: string | null;
+  new_model_category_id?: number | null;
+
+  branch_id?: number | null;
+  new_branch_name?: string | null;
+
+  new_branch_company_id?: number | null;
+
+  new_company_name?: string | null;
+  new_company_city_id?: number | null;
+  new_company_city_name?: string | null;
+  new_company_city_county_id?: number | null;
+
+  new_branch_city_id?: number | null;
+  new_branch_city_name?: string | null;
+  new_branch_city_county_id?: number | null;
+
+  reg_number?: string;
+  vla_year?: number | null;
+  vin_code?: string | null;
+  chassis?: string | null;
+  condition?:
+    | "Töökorras"
+    | "Ei_tööta"
+    | "Maha_kantud"
+    | "Müüdud"
+    | "Teadmata";
+
   user_id: number;
 }
 
@@ -374,6 +428,173 @@ function getPendingReviewData() {
   };
 }
 
+async function createPendingCity(
+  tx: Prisma.TransactionClient,
+  data: {
+    name: string;
+    county_id: number;
+    user_id: number;
+  }
+) {
+  return tx.cities.create({
+    data: {
+      name: data.name,
+      county_id: data.county_id,
+      status: ReviewStatus.Ootel,
+      created_by: data.user_id,
+      review_comment: null,
+    },
+  });
+}
+
+async function resolveModelId(
+  tx: Prisma.TransactionClient,
+  data: CreateVehicleWithFirstPhotoData
+) {
+  if (data.model_id) {
+    return data.model_id;
+  }
+
+  if (
+    data.new_model_manufacturer &&
+    data.new_model_name &&
+    data.new_model_category_id
+  ) {
+    const model = await tx.models.create({
+      data: {
+        manufacturer: data.new_model_manufacturer,
+        name: data.new_model_name,
+        category_id: data.new_model_category_id,
+        status: ReviewStatus.Ootel,
+        created_by: data.user_id,
+        review_comment: null,
+      },
+    });
+
+    return model.model_id;
+  }
+
+  throw new Error("model_id or new model data is required");
+}
+
+async function resolveBranchId(
+  tx: Prisma.TransactionClient,
+  data: CreateVehicleWithFirstPhotoData
+) {
+  if (data.branch_id) {
+    return data.branch_id;
+  }
+
+  const hasNewBranchData =
+    Boolean(data.new_branch_name) ||
+    Boolean(data.new_branch_company_id) ||
+    Boolean(data.new_company_name) ||
+    Boolean(data.new_company_city_id) ||
+    Boolean(data.new_company_city_name) ||
+    Boolean(data.new_company_city_county_id) ||
+    Boolean(data.new_branch_city_id) ||
+    Boolean(data.new_branch_city_name) ||
+    Boolean(data.new_branch_city_county_id);
+
+  if (!hasNewBranchData) {
+    return null;
+  }
+
+  let companyId = data.new_branch_company_id ?? null;
+
+  if (!companyId && data.new_company_name) {
+    let companyCityId = data.new_company_city_id ?? null;
+
+    if (
+      !companyCityId &&
+      data.new_company_city_name &&
+      data.new_company_city_county_id
+    ) {
+      const companyCity = await createPendingCity(tx, {
+        name: data.new_company_city_name,
+        county_id: data.new_company_city_county_id,
+        user_id: data.user_id,
+      });
+
+      companyCityId = companyCity.city_id;
+    }
+
+    if (!companyCityId) {
+      throw new Error("company city is required");
+    }
+
+    const company = await tx.companies.create({
+      data: {
+        name: data.new_company_name,
+        city_id: companyCityId,
+        status: ReviewStatus.Ootel,
+        created_by: data.user_id,
+        review_comment: null,
+      },
+    });
+
+    companyId = company.company_id;
+  }
+
+  if (!companyId) {
+    throw new Error("company is required for new branch");
+  }
+
+  let branchCityId = data.new_branch_city_id ?? null;
+
+  if (
+    !branchCityId &&
+    data.new_branch_city_name &&
+    data.new_branch_city_county_id
+  ) {
+    const branchCity = await createPendingCity(tx, {
+      name: data.new_branch_city_name,
+      county_id: data.new_branch_city_county_id,
+      user_id: data.user_id,
+    });
+
+    branchCityId = branchCity.city_id;
+  }
+
+  if (!branchCityId) {
+    throw new Error("branch city is required");
+  }
+
+  const branch = await tx.company_branches.create({
+    data: {
+      company_id: companyId,
+      city_id: branchCityId,
+      branch_name: data.new_branch_name?.trim() || "Peafiliaal",
+      status: ReviewStatus.Ootel,
+      created_by: data.user_id,
+      review_comment: null,
+    },
+  });
+
+  return branch.branch_id;
+}
+
+async function resolveFirstPhotoCityId(
+  tx: Prisma.TransactionClient,
+  data: CreateVehicleWithFirstPhotoData
+) {
+  if (data.city_id) {
+    return data.city_id;
+  }
+
+  if (data.new_city_name && data.new_city_county_id) {
+    const city = await createPendingCity(tx, {
+      name: data.new_city_name,
+      county_id: data.new_city_county_id,
+      user_id: data.user_id,
+    });
+
+    return city.city_id;
+  }
+
+  return null;
+}
+
 async function setVehicleReferencesStatus(
   tx: Prisma.TransactionClient,
   vehicleId: number,
@@ -562,80 +783,6 @@ async function setFirstVehiclePhotoStatus(
       data: reviewData,
     });
   }
-}
-
-async function getSafeReferenceDeletePlan(
-  tx: Prisma.TransactionClient,
-  vehicleId: number
-) {
-  const vehicle = await tx.vehicles.findUnique({
-    where: {
-      vehicle_id: vehicleId,
-    },
-    include: {
-      model: true,
-      branch: {
-        include: {
-          company: true,
-        },
-      },
-      photos: {
-        select: {
-          photo_id: true,
-          cloudinary_public_id: true,
-        },
-      },
-    },
-  });
-
-  if (!vehicle) {
-    return null;
-  }
-
-  const modelVehicleCount = await tx.vehicles.count({
-    where: {
-      model_id: vehicle.model_id,
-    },
-  });
-
-  const shouldDeleteModel =
-    vehicle.model.status !== ReviewStatus.Kinnitatud &&
-    modelVehicleCount <= 1;
-
-  let shouldDeleteBranch = false;
-  let shouldDeleteCompany = false;
-
-  if (vehicle.branch) {
-    const branchVehicleCount = await tx.vehicles.count({
-      where: {
-        branch_id: vehicle.branch_id,
-      },
-    });
-
-    shouldDeleteBranch =
-      vehicle.branch.status !== ReviewStatus.Kinnitatud &&
-      branchVehicleCount <= 1;
-
-    if (vehicle.branch.company) {
-      const companyBranchCount = await tx.company_branches.count({
-        where: {
-          company_id: vehicle.branch.company_id,
-        },
-      });
-
-      shouldDeleteCompany =
-        vehicle.branch.company.status !== ReviewStatus.Kinnitatud &&
-        shouldDeleteBranch &&
-        companyBranchCount <= 1;
-    }
-  }
-
-  return {
-    vehicle,
-    shouldDeleteModel,
-    shouldDeleteBranch,
-    shouldDeleteCompany,
-  };
 }
 
 export async function getPublicVehicles(params: GetPublicVehiclesParams) {
@@ -928,10 +1075,14 @@ export async function createVehicleWithFirstPhoto(
   data: CreateVehicleWithFirstPhotoData
 ) {
   return prisma.$transaction(async (tx) => {
+    const modelId = await resolveModelId(tx, data);
+    const branchId = await resolveBranchId(tx, data);
+    const photoCityId = await resolveFirstPhotoCityId(tx, data);
+
     const vehicle = await tx.vehicles.create({
       data: {
-        model_id: data.model_id,
-        branch_id: data.branch_id ?? null,
+        model_id: modelId,
+        branch_id: branchId,
         reg_number: data.reg_number,
         vla_year: data.vla_year ?? null,
         vin_code: data.vin_code ?? null,
@@ -947,7 +1098,7 @@ export async function createVehicleWithFirstPhoto(
       data: {
         vehicle_id: vehicle.vehicle_id,
         author_id: data.user_id,
-        city_id: data.city_id ?? null,
+        city_id: photoCityId,
         place: data.place ?? null,
         taken_at: data.taken_at ? new Date(data.taken_at) : null,
         file_path: data.file_path,
@@ -972,7 +1123,7 @@ export async function getVehicleForEdit(vehicleId: number) {
   });
 }
 
-export async function updateVehicle(vehicleId: number, data: UpdateVehicleBody) {
+export async function updateVehicle(vehicleId: number, data: UpdateVehicleData) {
   return prisma.$transaction(async (tx) => {
     const currentVehicle = await tx.vehicles.findUnique({
       where: {
@@ -988,14 +1139,66 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleBody) 
       throw new Error("Kinnitatud sõidukit ei saa muuta.");
     }
 
+    let nextModelId: number | undefined;
+
+    if (data.new_model_manufacturer && data.new_model_name && data.new_model_category_id) {
+      nextModelId = await resolveModelId(tx, {
+        model_id: null,
+        new_model_manufacturer: data.new_model_manufacturer,
+        new_model_name: data.new_model_name,
+        new_model_category_id: data.new_model_category_id,
+        reg_number: currentVehicle.reg_number,
+        file_path: "",
+        user_id: data.user_id,
+      });
+    } else if (data.model_id) {
+      nextModelId = data.model_id;
+    }
+
+    let nextBranchId: number | null | undefined;
+
+    const hasNewBranchData =
+      Boolean(data.new_branch_name) ||
+      Boolean(data.new_branch_company_id) ||
+      Boolean(data.new_company_name) ||
+      Boolean(data.new_company_city_id) ||
+      Boolean(data.new_company_city_name) ||
+      Boolean(data.new_company_city_county_id) ||
+      Boolean(data.new_branch_city_id) ||
+      Boolean(data.new_branch_city_name) ||
+      Boolean(data.new_branch_city_county_id);
+
+    if (hasNewBranchData) {
+      nextBranchId = await resolveBranchId(tx, {
+        model_id: currentVehicle.model_id,
+        branch_id: null,
+        new_branch_name: data.new_branch_name,
+        new_branch_company_id: data.new_branch_company_id,
+        new_company_name: data.new_company_name,
+        new_company_city_id: data.new_company_city_id,
+        new_company_city_name: data.new_company_city_name,
+        new_company_city_county_id: data.new_company_city_county_id,
+        new_branch_city_id: data.new_branch_city_id,
+        new_branch_city_name: data.new_branch_city_name,
+        new_branch_city_county_id: data.new_branch_city_county_id,
+        reg_number: currentVehicle.reg_number,
+        file_path: "",
+        user_id: data.user_id,
+      });
+    } else if (data.branch_id !== undefined) {
+      nextBranchId = data.branch_id;
+    }
+
     const updatedVehicle = await tx.vehicles.update({
       where: {
         vehicle_id: vehicleId,
       },
       data: {
-        ...(data.model_id !== undefined ? { model_id: data.model_id } : {}),
-        ...(data.branch_id !== undefined ? { branch_id: data.branch_id } : {}),
-        ...(data.reg_number !== undefined ? { reg_number: data.reg_number } : {}),
+        ...(nextModelId !== undefined ? { model_id: nextModelId } : {}),
+        ...(nextBranchId !== undefined ? { branch_id: nextBranchId } : {}),
+        ...(data.reg_number !== undefined
+          ? { reg_number: data.reg_number }
+          : {}),
         ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
         ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
         ...(data.chassis !== undefined ? { chassis: data.chassis } : {}),
@@ -1005,6 +1208,12 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleBody) 
     });
 
     await resetVehicleReferencesToPending(tx, vehicleId);
+
+    await cleanupUnusedVehicleReferences(tx, {
+      model_id: currentVehicle.model_id,
+      branch_id: currentVehicle.branch_id,
+      photo_city_ids: [],
+    });
 
     return updatedVehicle;
   });

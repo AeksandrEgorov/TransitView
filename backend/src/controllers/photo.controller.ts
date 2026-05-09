@@ -619,9 +619,19 @@ export async function updatePhotoHandler(
       return;
     }
 
+    const uploadedImage = req.file
+      ? await uploadBufferToCloudinary(req.file.buffer)
+      : null;
+
     const updatedPhoto = await updatePhoto(photoId, {
       ...body,
       new_city: newCity,
+      ...(uploadedImage
+        ? {
+            file_path: uploadedImage.secure_url,
+            cloudinary_public_id: uploadedImage.public_id,
+          }
+        : {}),
       user_id: req.user.userId,
     });
 

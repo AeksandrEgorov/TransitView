@@ -15,7 +15,7 @@ import {
 } from "../controllers/photo.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
-import  upload  from "../config/multer.js";
+import upload from "../config/multer.js";
 
 const router = Router();
 
@@ -45,7 +45,12 @@ router.get("/:id", getPhotoHandler);
 
 router.post("/", requireAuth, createPhotoHandler);
 
-router.patch("/:id", requireAuth, updatePhotoHandler);
+router.patch(
+  "/:id",
+  requireAuth,
+  upload.single("image"),
+  updatePhotoHandler
+);
 
 router.delete("/:id", requireAuth, deletePhotoHandler);
 

@@ -467,38 +467,91 @@ export async function deleteManagePhoto(photoId: number) {
 
   return photo;
 }
+function getPhotoApproveData(reviewerId?: number) {
+  return {
+    status: ReviewStatus.Kinnitatud,
+    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
+    reviewed_at: new Date(),
+    review_comment: null,
+  };
+}
 
-export async function approveManagePhoto(photoId: number) {
-  return prisma.photos.update({
+function getPhotoRejectData(reviewComment: string, reviewerId?: number) {
+  if (!reviewComment || !reviewComment.trim()) {
+    throw new Error("Reject comment is required");
+  }
+
+  return {
+    status: ReviewStatus.Tagasi_lukatud,
+    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
+    reviewed_at: new Date(),
+    review_comment: reviewComment.trim(),
+  };
+}
+
+async function setPhotoCityStatus(
+  tx: Prisma.TransactionClient,
+  photoId: number,
+  data:
+    | ReturnType<typeof getPhotoApproveData>
+    | ReturnType<typeof getPhotoRejectData>
+) {
+  const photo = await tx.photos.findUnique({
     where: {
       photo_id: photoId,
     },
-    data: {
-      status: ReviewStatus.Kinnitatud,
-      reviewed_at: new Date(),
-      review_comment: null,
+    include: {
+      city: true,
     },
-    include: managePhotoDetailInclude,
+  });
+
+  if (!photo?.city || photo.city.status === ReviewStatus.Kinnitatud) {
+    return;
+  }
+
+  await tx.cities.update({
+    where: {
+      city_id: photo.city.city_id,
+    },
+    data,
+  });
+}
+
+export async function approveManagePhoto(
+  photoId: number,
+  reviewerId?: number
+) {
+  return prisma.$transaction(async (tx) => {
+    const reviewData = getPhotoApproveData(reviewerId);
+
+    await setPhotoCityStatus(tx, photoId, reviewData);
+
+    return tx.photos.update({
+      where: {
+        photo_id: photoId,
+      },
+      data: reviewData,
+      include: managePhotoDetailInclude,
+    });
   });
 }
 
 export async function rejectManagePhoto(
   photoId: number,
-  reviewComment: string
+  reviewComment: string,
+  reviewerId?: number
 ) {
-  if (!reviewComment || !reviewComment.trim()) {
-    throw new Error("Reject comment is required");
-  }
+  return prisma.$transaction(async (tx) => {
+    const reviewData = getPhotoRejectData(reviewComment, reviewerId);
 
-  return prisma.photos.update({
-    where: {
-      photo_id: photoId,
-    },
-    data: {
-      status: ReviewStatus.Tagasi_lukatud,
-      reviewed_at: new Date(),
-      review_comment: reviewComment.trim(),
-    },
-    include: managePhotoDetailInclude,
+    await setPhotoCityStatus(tx, photoId, reviewData);
+
+    return tx.photos.update({
+      where: {
+        photo_id: photoId,
+      },
+      data: reviewData,
+      include: managePhotoDetailInclude,
+    });
   });
 }
