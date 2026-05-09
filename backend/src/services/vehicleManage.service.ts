@@ -7,6 +7,7 @@ import {
 } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
 import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
+import { cleanupUnusedVehicleReferences } from "./referenceCleanup.service.js";
 
 interface GetManageVehiclesParams {
   page: number;
@@ -474,6 +475,10 @@ export async function deleteManageVehicle(vehicleId: number) {
     return null;
   }
 
+  if (vehicle.status === ReviewStatus.Kinnitatud) {
+    throw new Error("Kinnitatud sõidukit ei saa kustutada");
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.photos.deleteMany({
       where: {
@@ -485,6 +490,12 @@ export async function deleteManageVehicle(vehicleId: number) {
       where: {
         vehicle_id: vehicleId,
       },
+    });
+
+    await cleanupUnusedVehicleReferences(tx, {
+      model_id: vehicle.model_id,
+      branch_id: vehicle.branch_id,
+      photo_city_ids: vehicle.photos.map((photo) => photo.city_id),
     });
   });
 

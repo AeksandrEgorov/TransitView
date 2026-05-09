@@ -54,9 +54,7 @@ function parseDateQuery(
   return date;
 }
 
-function parseReviewStatus(
-  value: unknown
-): ReviewStatus | undefined | null {
+function parseReviewStatus(value: unknown): ReviewStatus | undefined | null {
   const rawValue = getSingleString(value);
 
   if (!rawValue) {
@@ -124,6 +122,13 @@ function isRejectCommentError(error: unknown) {
   return error instanceof Error && error.message === "Reject comment is required";
 }
 
+function isProtectedPhotoError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("Kinnitatud fotot ei saa kustutada")
+  );
+}
+
 export async function getManagePhotosHandler(
   req: AuthRequest,
   res: Response
@@ -162,6 +167,7 @@ export async function getManagePhotosHandler(
     const countyId = parseOptionalPositiveInt(query.countyId);
     const vehicleId = parseOptionalPositiveInt(query.vehicleId);
     const authorId = parseOptionalPositiveInt(query.authorId);
+    const vehicleCreatorId = parseOptionalPositiveInt(query.vehicleCreatorId);
     const categoryId = parseOptionalPositiveInt(query.categoryId);
 
     if (
@@ -169,6 +175,7 @@ export async function getManagePhotosHandler(
       countyId === null ||
       vehicleId === null ||
       authorId === null ||
+      vehicleCreatorId === null ||
       categoryId === null
     ) {
       res.status(400).json({ message: "Invalid numeric query parameter" });
@@ -204,6 +211,7 @@ export async function getManagePhotosHandler(
       countyId,
       vehicleId,
       authorId,
+      vehicleCreatorId,
       categoryId,
       condition,
       createdFrom,
@@ -324,6 +332,13 @@ export async function deleteManagePhotoHandler(
       message: "Photo deleted successfully",
     });
   } catch (error) {
+    if (isProtectedPhotoError(error)) {
+      res.status(403).json({
+        message: error instanceof Error ? error.message : "Forbidden",
+      });
+      return;
+    }
+
     console.error("Delete manage photo error:", error);
     res.status(500).json({ message: "Internal server error" });
   }

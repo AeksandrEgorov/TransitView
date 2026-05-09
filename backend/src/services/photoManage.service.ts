@@ -7,6 +7,7 @@ import {
 } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
 import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
+import { cleanupUnusedPhotoReferences } from "./referenceCleanup.service.js";
 
 interface GetManagePhotosParams {
   page: number;
@@ -440,10 +441,20 @@ export async function deleteManagePhoto(photoId: number) {
     return null;
   }
 
-  await prisma.photos.delete({
-    where: {
-      photo_id: photoId,
-    },
+  if (photo.status === ReviewStatus.Kinnitatud) {
+    throw new Error("Kinnitatud fotot ei saa kustutada");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.photos.delete({
+      where: {
+        photo_id: photoId,
+      },
+    });
+
+    await cleanupUnusedPhotoReferences(tx, {
+      city_id: photo.city_id,
+    });
   });
 
   if (photo.cloudinary_public_id) {

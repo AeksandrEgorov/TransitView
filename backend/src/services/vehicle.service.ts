@@ -7,6 +7,7 @@ import {
 import type { UpdateVehicleBody } from "../types/vehicle.js";
 import { dbView } from "../utils/dbView.js";
 import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
+import { cleanupUnusedVehicleReferences } from "./referenceCleanup.service.js";
 
 interface GetPublicVehiclesParams {
   page: number;
@@ -1010,74 +1011,56 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleBody) 
 }
 
 export async function deleteVehicle(vehicleId: number) {
-  const cloudinaryPublicIds: string[] = [];
+  const vehicle = await prisma.vehicles.findUnique({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    include: {
+      photos: true,
+    },
+  });
 
-  const deletedVehicle = await prisma.$transaction(async (tx) => {
-    const deletePlan = await getSafeReferenceDeletePlan(tx, vehicleId);
+  if (!vehicle) {
+    return null;
+  }
 
-    if (!deletePlan) {
-      return null;
-    }
+  if (vehicle.status === ReviewStatus.Kinnitatud) {
+    throw new Error("Kinnitatud sõidukit ei saa kustutada");
+  }
 
-    const { vehicle, shouldDeleteModel, shouldDeleteBranch, shouldDeleteCompany } =
-      deletePlan;
-
-    if (vehicle.status === ReviewStatus.Kinnitatud) {
-      throw new Error("Kinnitatud sõidukit ei saa kustutada.");
-    }
-
-    for (const photo of vehicle.photos) {
-      if (photo.cloudinary_public_id) {
-        cloudinaryPublicIds.push(photo.cloudinary_public_id);
-      }
-    }
-
+  await prisma.$transaction(async (tx) => {
     await tx.photos.deleteMany({
       where: {
         vehicle_id: vehicleId,
       },
     });
 
-    const removedVehicle = await tx.vehicles.delete({
+    await tx.vehicles.delete({
       where: {
         vehicle_id: vehicleId,
       },
     });
 
-    if (shouldDeleteModel) {
-      await tx.models.delete({
-        where: {
-          model_id: vehicle.model_id,
-        },
-      });
-    }
-
-    if (shouldDeleteBranch && vehicle.branch_id) {
-      await tx.company_branches.delete({
-        where: {
-          branch_id: vehicle.branch_id,
-        },
-      });
-    }
-
-    if (shouldDeleteCompany && vehicle.branch?.company_id) {
-      await tx.companies.delete({
-        where: {
-          company_id: vehicle.branch.company_id,
-        },
-      });
-    }
-
-    return removedVehicle;
+    await cleanupUnusedVehicleReferences(tx, {
+      model_id: vehicle.model_id,
+      branch_id: vehicle.branch_id,
+      photo_city_ids: vehicle.photos.map((photo) => photo.city_id),
+    });
   });
 
-  if (cloudinaryPublicIds.length > 0) {
-    await Promise.allSettled(
-      cloudinaryPublicIds.map((publicId) => deleteCloudinaryImage(publicId))
-    );
+  for (const photo of vehicle.photos) {
+    if (!photo.cloudinary_public_id) {
+      continue;
+    }
+
+    try {
+      await deleteCloudinaryImage(photo.cloudinary_public_id);
+    } catch (error) {
+      console.error("Failed to delete Cloudinary image:", error);
+    }
   }
 
-  return deletedVehicle;
+  return vehicle;
 }
 
 export async function getPendingVehicles(params: {

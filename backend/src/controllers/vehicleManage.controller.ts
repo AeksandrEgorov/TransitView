@@ -140,6 +140,13 @@ function isRejectCommentError(error: unknown) {
   return error instanceof Error && error.message === "Reject comment is required";
 }
 
+function isProtectedVehicleError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("Kinnitatud sõidukit ei saa kustutada")
+  );
+}
+
 export async function getManageVehiclesHandler(
   req: AuthRequest,
   res: Response
@@ -358,6 +365,13 @@ export async function deleteManageVehicleHandler(
       message: "Vehicle deleted successfully",
     });
   } catch (error) {
+    if (isProtectedVehicleError(error)) {
+      res.status(403).json({
+        message: error instanceof Error ? error.message : "Forbidden",
+      });
+      return;
+    }
+
     console.error("Delete manage vehicle error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
