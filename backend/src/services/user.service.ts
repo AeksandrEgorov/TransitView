@@ -1,15 +1,7 @@
 import prisma from "../config/prisma.js";
 import { Prisma, UserRole } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
-
-interface GetUsersParams {
-  page: number;
-  limit: number;
-  role?: UserRole;
-  search?: string;
-  createdFrom?: Date;
-  createdTo?: Date;
-}
+import type { GetUsersParams } from "../types/user.js";
 
 type CountRow = {
   total: bigint | number;
@@ -18,6 +10,7 @@ type CountRow = {
 type AdminUserViewRow = {
   user_id: number;
   username: string;
+  email: string;
   role: string;
   created_at: Date;
 
@@ -33,6 +26,28 @@ type AdminUserViewRow = {
   rejected_photos_count: number | bigint;
 };
 
+type CreateUserData = {
+  username: string;
+  email: string;
+  password_hash: string;
+  role: UserRole;
+};
+
+type UpdateUserData = {
+  username?: string;
+  email?: string;
+  password_hash?: string;
+  role?: UserRole;
+};
+
+const userSelect = {
+  user_id: true,
+  username: true,
+  email: true,
+  role: true,
+  created_at: true,
+};
+
 function toNumber(value: number | bigint | null | undefined) {
   return Number(value ?? 0);
 }
@@ -41,6 +56,7 @@ function mapAdminUserFromView(row: AdminUserViewRow) {
   return {
     user_id: row.user_id,
     username: row.username,
+    email: row.email,
     role: row.role as UserRole,
     created_at: row.created_at,
 
@@ -68,7 +84,14 @@ export async function getUsers(params: GetUsersParams) {
   }
 
   if (search) {
-    filters.push(Prisma.sql`u.username ILIKE ${`%${search}%`}`);
+    const searchValue = `%${search}%`;
+
+    filters.push(Prisma.sql`
+      (
+        u.username ILIKE ${searchValue}
+        OR u.email ILIKE ${searchValue}
+      )
+    `);
   }
 
   if (createdFrom) {
@@ -119,12 +142,7 @@ export async function getUserById(userId: number) {
     where: {
       user_id: userId,
     },
-    select: {
-      user_id: true,
-      username: true,
-      role: true,
-      created_at: true,
-    },
+    select: userSelect,
   });
 }
 
@@ -136,41 +154,28 @@ export async function getUserByUsername(username: string) {
   });
 }
 
-export async function createUser(data: {
-  username: string;
-  password_hash: string;
-  role: UserRole;
-}) {
-  return prisma.users.create({
-    data,
-    select: {
-      user_id: true,
-      username: true,
-      role: true,
-      created_at: true,
+export async function getUserByEmail(email: string) {
+  return prisma.users.findUnique({
+    where: {
+      email,
     },
   });
 }
 
-export async function updateUser(
-  userId: number,
-  data: {
-    username?: string;
-    password_hash?: string;
-    role?: UserRole;
-  }
-) {
+export async function createUser(data: CreateUserData) {
+  return prisma.users.create({
+    data,
+    select: userSelect,
+  });
+}
+
+export async function updateUser(userId: number, data: UpdateUserData) {
   return prisma.users.update({
     where: {
       user_id: userId,
     },
     data,
-    select: {
-      user_id: true,
-      username: true,
-      role: true,
-      created_at: true,
-    },
+    select: userSelect,
   });
 }
 
@@ -182,6 +187,7 @@ export async function deleteUser(userId: number) {
     select: {
       user_id: true,
       username: true,
+      email: true,
       role: true,
     },
   });

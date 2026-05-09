@@ -11,14 +11,20 @@ import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 interface GetManagePhotosParams {
   page: number;
   limit: number;
+
   status?: ReviewStatus;
   regNumber?: string;
+
   cityId?: number;
   countyId?: number;
   vehicleId?: number;
+
   authorId?: number;
+  vehicleCreatorId?: number;
+
   categoryId?: number;
   condition?: VehicleCondition;
+
   createdFrom?: Date;
   createdTo?: Date;
 }
@@ -77,7 +83,6 @@ type ManagePhotoViewRow = {
 
   branch_city_id: number | null;
   branch_city_name: string | null;
-
   branch_county_id: number | null;
   branch_county_name: string | null;
 
@@ -268,6 +273,7 @@ export async function getManagePhotos(params: GetManagePhotosParams) {
     countyId,
     vehicleId,
     authorId,
+    vehicleCreatorId,
     categoryId,
     condition,
     createdFrom,
@@ -299,6 +305,10 @@ export async function getManagePhotos(params: GetManagePhotosParams) {
 
   if (authorId) {
     filters.push(Prisma.sql`p.author_id = ${authorId}`);
+  }
+
+  if (vehicleCreatorId) {
+    filters.push(Prisma.sql`p.vehicle_created_by = ${vehicleCreatorId}`);
   }
 
   if (categoryId) {

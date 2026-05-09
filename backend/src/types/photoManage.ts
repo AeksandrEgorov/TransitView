@@ -8,9 +8,11 @@ export interface ManagePhotoListQuery {
   cityId?: string | string[];
   countyId?: string | string[];
   vehicleId?: string | string[];
-  authorId?: string | string[];
-  categoryId?: string | string[];
 
+  authorId?: string | string[];
+  vehicleCreatorId?: string | string[];
+
+  categoryId?: string | string[];
   condition?: string | string[];
 
   createdFrom?: string | string[];
