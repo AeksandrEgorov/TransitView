@@ -11,15 +11,21 @@ import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 interface GetManageVehiclesParams {
   page: number;
   limit: number;
+
   status?: ReviewStatus;
   regNumber?: string;
+
+  createdBy?: number;
+
   cityId?: number;
   countyId?: number;
   categoryId?: number;
   modelId?: number;
   companyId?: number;
   branchId?: number;
+
   condition?: VehicleCondition;
+
   createdFrom?: Date;
   createdTo?: Date;
 }
@@ -296,6 +302,7 @@ export async function getManageVehicles(params: GetManageVehiclesParams) {
     limit,
     status,
     regNumber,
+    createdBy,
     cityId,
     countyId,
     categoryId,
@@ -316,6 +323,10 @@ export async function getManageVehicles(params: GetManageVehiclesParams) {
 
   if (regNumber) {
     filters.push(Prisma.sql`v.reg_number ILIKE ${`%${regNumber}%`}`);
+  }
+
+  if (createdBy) {
+    filters.push(Prisma.sql`v.created_by = ${createdBy}`);
   }
 
   if (modelId) {

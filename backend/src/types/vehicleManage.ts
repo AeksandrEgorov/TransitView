@@ -5,6 +5,8 @@ export interface ManageVehicleListQuery {
   status?: string | string[];
   regNumber?: string | string[];
 
+  createdBy?: string | string[];
+
   cityId?: string | string[];
   countyId?: string | string[];
   categoryId?: string | string[];

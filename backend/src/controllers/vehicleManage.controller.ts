@@ -54,9 +54,7 @@ function parseDateQuery(
   return date;
 }
 
-function parseReviewStatus(
-  value: unknown
-): ReviewStatus | undefined | null {
+function parseReviewStatus(value: unknown): ReviewStatus | undefined | null {
   const rawValue = getSingleString(value);
 
   if (!rawValue) {
@@ -176,6 +174,8 @@ export async function getManageVehiclesHandler(
       return;
     }
 
+    const createdBy = parseOptionalPositiveInt(query.createdBy);
+
     const cityId = parseOptionalPositiveInt(query.cityId);
     const countyId = parseOptionalPositiveInt(query.countyId);
     const categoryId = parseOptionalPositiveInt(query.categoryId);
@@ -184,6 +184,7 @@ export async function getManageVehiclesHandler(
     const branchId = parseOptionalPositiveInt(query.branchId);
 
     if (
+      createdBy === null ||
       cityId === null ||
       countyId === null ||
       categoryId === null ||
@@ -220,6 +221,7 @@ export async function getManageVehiclesHandler(
       limit,
       status,
       regNumber: getSingleString(query.regNumber)?.trim() || undefined,
+      createdBy,
       cityId,
       countyId,
       categoryId,

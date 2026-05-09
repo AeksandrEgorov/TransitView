@@ -4,14 +4,17 @@ import bcrypt from "bcrypt";
 import type { AuthRequest } from "../types/auth.js";
 import type { UserListQuery } from "../types/user.js";
 import { UserRole } from "../generated/prisma/client.js";
+
 import {
   createUser,
   deleteUser,
+  getUserByEmail,
   getUserById,
   getUserByUsername,
   getUsers,
   updateUser,
 } from "../services/user.service.js";
+
 import {
   createUserSchema,
   updateUserSchema,
@@ -214,11 +217,20 @@ export async function createUserHandler(
       return;
     }
 
-    const existingUser = await getUserByUsername(body.username);
+    const existingUsername = await getUserByUsername(body.username);
 
-    if (existingUser) {
+    if (existingUsername) {
       res.status(409).json({
         message: "Username already exists",
+      });
+      return;
+    }
+
+    const existingEmail = await getUserByEmail(body.email);
+
+    if (existingEmail) {
+      res.status(409).json({
+        message: "Email already exists",
       });
       return;
     }
@@ -227,6 +239,7 @@ export async function createUserHandler(
 
     const user = await createUser({
       username: body.username,
+      email: body.email,
       password_hash: passwordHash,
       role: body.role as UserRole,
     });
@@ -238,7 +251,7 @@ export async function createUserHandler(
   } catch (error) {
     if (isPrismaUniqueError(error)) {
       res.status(409).json({
-        message: "Username already exists",
+        message: "Username or email already exists",
       });
       return;
     }
@@ -304,14 +317,30 @@ export async function updateUserHandler(
       }
     }
 
+    if (body.email) {
+      const userWithSameEmail = await getUserByEmail(body.email);
+
+      if (userWithSameEmail && userWithSameEmail.user_id !== userId) {
+        res.status(409).json({
+          message: "Email already exists",
+        });
+        return;
+      }
+    }
+
     const updateData: {
       username?: string;
+      email?: string;
       password_hash?: string;
       role?: UserRole;
     } = {};
 
     if (body.username !== undefined) {
       updateData.username = body.username;
+    }
+
+    if (body.email !== undefined) {
+      updateData.email = body.email;
     }
 
     if (body.role !== undefined) {
@@ -343,7 +372,7 @@ export async function updateUserHandler(
 
     if (isPrismaUniqueError(error)) {
       res.status(409).json({
-        message: "Username already exists",
+        message: "Username or email already exists",
       });
       return;
     }
