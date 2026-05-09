@@ -6,6 +6,7 @@ import {
 } from "../generated/prisma/client.js";
 import type { UpdateVehicleBody } from "../types/vehicle.js";
 import { dbView } from "../utils/dbView.js";
+import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 
 interface GetPublicVehiclesParams {
   page: number;
@@ -345,6 +346,297 @@ function mapMyVehicleFromView(row: MyVehicleViewRow) {
   };
 }
 
+function getApprovedReviewData(reviewerId: number) {
+  return {
+    status: ReviewStatus.Kinnitatud,
+    reviewed_by: reviewerId,
+    reviewed_at: new Date(),
+    review_comment: null,
+  };
+}
+
+function getRejectedReviewData(reviewerId: number, reviewComment: string) {
+  return {
+    status: ReviewStatus.Tagasi_lukatud,
+    reviewed_by: reviewerId,
+    reviewed_at: new Date(),
+    review_comment: reviewComment,
+  };
+}
+
+function getPendingReviewData() {
+  return {
+    status: ReviewStatus.Ootel,
+    reviewed_by: null,
+    reviewed_at: null,
+    review_comment: null,
+  };
+}
+
+async function setVehicleReferencesStatus(
+  tx: Prisma.TransactionClient,
+  vehicleId: number,
+  status: ReviewStatus,
+  reviewerId: number,
+  reviewComment?: string
+) {
+  const vehicle = await tx.vehicles.findUnique({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    include: {
+      model: true,
+      branch: {
+        include: {
+          company: true,
+          city: true,
+        },
+      },
+    },
+  });
+
+  if (!vehicle) {
+    return;
+  }
+
+  const reviewData =
+    status === ReviewStatus.Kinnitatud
+      ? getApprovedReviewData(reviewerId)
+      : getRejectedReviewData(reviewerId, reviewComment ?? "");
+
+  if (vehicle.model.status !== ReviewStatus.Kinnitatud) {
+    await tx.models.update({
+      where: {
+        model_id: vehicle.model_id,
+      },
+      data: reviewData,
+    });
+  }
+
+  if (vehicle.branch && vehicle.branch.status !== ReviewStatus.Kinnitatud) {
+    await tx.company_branches.update({
+      where: {
+        branch_id: vehicle.branch.branch_id,
+      },
+      data: reviewData,
+    });
+  }
+
+  if (
+    vehicle.branch?.company &&
+    vehicle.branch.company.status !== ReviewStatus.Kinnitatud
+  ) {
+    await tx.companies.update({
+      where: {
+        company_id: vehicle.branch.company.company_id,
+      },
+      data: reviewData,
+    });
+  }
+
+  if (
+    vehicle.branch?.city &&
+    vehicle.branch.city.status !== ReviewStatus.Kinnitatud
+  ) {
+    await tx.cities.update({
+      where: {
+        city_id: vehicle.branch.city.city_id,
+      },
+      data: reviewData,
+    });
+  }
+}
+
+async function resetVehicleReferencesToPending(
+  tx: Prisma.TransactionClient,
+  vehicleId: number
+) {
+  const vehicle = await tx.vehicles.findUnique({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    include: {
+      model: true,
+      branch: {
+        include: {
+          company: true,
+          city: true,
+        },
+      },
+    },
+  });
+
+  if (!vehicle) {
+    return;
+  }
+
+  if (vehicle.model.status !== ReviewStatus.Kinnitatud) {
+    await tx.models.update({
+      where: {
+        model_id: vehicle.model_id,
+      },
+      data: getPendingReviewData(),
+    });
+  }
+
+  if (vehicle.branch && vehicle.branch.status !== ReviewStatus.Kinnitatud) {
+    await tx.company_branches.update({
+      where: {
+        branch_id: vehicle.branch.branch_id,
+      },
+      data: getPendingReviewData(),
+    });
+  }
+
+  if (
+    vehicle.branch?.company &&
+    vehicle.branch.company.status !== ReviewStatus.Kinnitatud
+  ) {
+    await tx.companies.update({
+      where: {
+        company_id: vehicle.branch.company.company_id,
+      },
+      data: getPendingReviewData(),
+    });
+  }
+
+  if (
+    vehicle.branch?.city &&
+    vehicle.branch.city.status !== ReviewStatus.Kinnitatud
+  ) {
+    await tx.cities.update({
+      where: {
+        city_id: vehicle.branch.city.city_id,
+      },
+      data: getPendingReviewData(),
+    });
+  }
+}
+
+async function setFirstVehiclePhotoStatus(
+  tx: Prisma.TransactionClient,
+  vehicleId: number,
+  status: ReviewStatus,
+  reviewerId: number,
+  reviewComment?: string
+) {
+  const firstPhoto = await tx.photos.findFirst({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    orderBy: {
+      created_at: "asc",
+    },
+    include: {
+      city: true,
+    },
+  });
+
+  if (!firstPhoto) {
+    return;
+  }
+
+  const reviewData =
+    status === ReviewStatus.Kinnitatud
+      ? getApprovedReviewData(reviewerId)
+      : getRejectedReviewData(reviewerId, reviewComment ?? "");
+
+  if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
+    await tx.cities.update({
+      where: {
+        city_id: firstPhoto.city.city_id,
+      },
+      data: reviewData,
+    });
+  }
+
+  if (
+    status === ReviewStatus.Kinnitatud ||
+    firstPhoto.status !== ReviewStatus.Kinnitatud
+  ) {
+    await tx.photos.update({
+      where: {
+        photo_id: firstPhoto.photo_id,
+      },
+      data: reviewData,
+    });
+  }
+}
+
+async function getSafeReferenceDeletePlan(
+  tx: Prisma.TransactionClient,
+  vehicleId: number
+) {
+  const vehicle = await tx.vehicles.findUnique({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    include: {
+      model: true,
+      branch: {
+        include: {
+          company: true,
+        },
+      },
+      photos: {
+        select: {
+          photo_id: true,
+          cloudinary_public_id: true,
+        },
+      },
+    },
+  });
+
+  if (!vehicle) {
+    return null;
+  }
+
+  const modelVehicleCount = await tx.vehicles.count({
+    where: {
+      model_id: vehicle.model_id,
+    },
+  });
+
+  const shouldDeleteModel =
+    vehicle.model.status !== ReviewStatus.Kinnitatud &&
+    modelVehicleCount <= 1;
+
+  let shouldDeleteBranch = false;
+  let shouldDeleteCompany = false;
+
+  if (vehicle.branch) {
+    const branchVehicleCount = await tx.vehicles.count({
+      where: {
+        branch_id: vehicle.branch_id,
+      },
+    });
+
+    shouldDeleteBranch =
+      vehicle.branch.status !== ReviewStatus.Kinnitatud &&
+      branchVehicleCount <= 1;
+
+    if (vehicle.branch.company) {
+      const companyBranchCount = await tx.company_branches.count({
+        where: {
+          company_id: vehicle.branch.company_id,
+        },
+      });
+
+      shouldDeleteCompany =
+        vehicle.branch.company.status !== ReviewStatus.Kinnitatud &&
+        shouldDeleteBranch &&
+        companyBranchCount <= 1;
+    }
+  }
+
+  return {
+    vehicle,
+    shouldDeleteModel,
+    shouldDeleteBranch,
+    shouldDeleteCompany,
+  };
+}
+
 export async function getPublicVehicles(params: GetPublicVehiclesParams) {
   const {
     page,
@@ -680,28 +972,112 @@ export async function getVehicleForEdit(vehicleId: number) {
 }
 
 export async function updateVehicle(vehicleId: number, data: UpdateVehicleBody) {
-  return prisma.vehicles.update({
-    where: {
-      vehicle_id: vehicleId,
-    },
-    data: {
-      ...(data.model_id !== undefined ? { model_id: data.model_id } : {}),
-      ...(data.branch_id !== undefined ? { branch_id: data.branch_id } : {}),
-      ...(data.reg_number !== undefined ? { reg_number: data.reg_number } : {}),
-      ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
-      ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
-      ...(data.chassis !== undefined ? { chassis: data.chassis } : {}),
-      ...(data.condition !== undefined ? { condition: data.condition } : {}),
-    },
+  return prisma.$transaction(async (tx) => {
+    const currentVehicle = await tx.vehicles.findUnique({
+      where: {
+        vehicle_id: vehicleId,
+      },
+    });
+
+    if (!currentVehicle) {
+      return null;
+    }
+
+    if (currentVehicle.status === ReviewStatus.Kinnitatud) {
+      throw new Error("Kinnitatud sõidukit ei saa muuta.");
+    }
+
+    const updatedVehicle = await tx.vehicles.update({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      data: {
+        ...(data.model_id !== undefined ? { model_id: data.model_id } : {}),
+        ...(data.branch_id !== undefined ? { branch_id: data.branch_id } : {}),
+        ...(data.reg_number !== undefined ? { reg_number: data.reg_number } : {}),
+        ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
+        ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
+        ...(data.chassis !== undefined ? { chassis: data.chassis } : {}),
+        ...(data.condition !== undefined ? { condition: data.condition } : {}),
+        ...getPendingReviewData(),
+      },
+    });
+
+    await resetVehicleReferencesToPending(tx, vehicleId);
+
+    return updatedVehicle;
   });
 }
 
 export async function deleteVehicle(vehicleId: number) {
-  return prisma.vehicles.delete({
-    where: {
-      vehicle_id: vehicleId,
-    },
+  const cloudinaryPublicIds: string[] = [];
+
+  const deletedVehicle = await prisma.$transaction(async (tx) => {
+    const deletePlan = await getSafeReferenceDeletePlan(tx, vehicleId);
+
+    if (!deletePlan) {
+      return null;
+    }
+
+    const { vehicle, shouldDeleteModel, shouldDeleteBranch, shouldDeleteCompany } =
+      deletePlan;
+
+    if (vehicle.status === ReviewStatus.Kinnitatud) {
+      throw new Error("Kinnitatud sõidukit ei saa kustutada.");
+    }
+
+    for (const photo of vehicle.photos) {
+      if (photo.cloudinary_public_id) {
+        cloudinaryPublicIds.push(photo.cloudinary_public_id);
+      }
+    }
+
+    await tx.photos.deleteMany({
+      where: {
+        vehicle_id: vehicleId,
+      },
+    });
+
+    const removedVehicle = await tx.vehicles.delete({
+      where: {
+        vehicle_id: vehicleId,
+      },
+    });
+
+    if (shouldDeleteModel) {
+      await tx.models.delete({
+        where: {
+          model_id: vehicle.model_id,
+        },
+      });
+    }
+
+    if (shouldDeleteBranch && vehicle.branch_id) {
+      await tx.company_branches.delete({
+        where: {
+          branch_id: vehicle.branch_id,
+        },
+      });
+    }
+
+    if (shouldDeleteCompany && vehicle.branch?.company_id) {
+      await tx.companies.delete({
+        where: {
+          company_id: vehicle.branch.company_id,
+        },
+      });
+    }
+
+    return removedVehicle;
   });
+
+  if (cloudinaryPublicIds.length > 0) {
+    await Promise.allSettled(
+      cloudinaryPublicIds.map((publicId) => deleteCloudinaryImage(publicId))
+    );
+  }
+
+  return deletedVehicle;
 }
 
 export async function getPendingVehicles(params: {
@@ -741,39 +1117,26 @@ export async function getPendingVehicles(params: {
 
 export async function approveVehicle(vehicleId: number, reviewerId: number) {
   return prisma.$transaction(async (tx) => {
+    await setVehicleReferencesStatus(
+      tx,
+      vehicleId,
+      ReviewStatus.Kinnitatud,
+      reviewerId
+    );
+
     const vehicle = await tx.vehicles.update({
       where: {
         vehicle_id: vehicleId,
       },
-      data: {
-        status: ReviewStatus.Kinnitatud,
-        reviewed_by: reviewerId,
-        reviewed_at: new Date(),
-        review_comment: null,
-      },
+      data: getApprovedReviewData(reviewerId),
     });
 
-    const firstPhoto = await tx.photos.findFirst({
-      where: {
-        vehicle_id: vehicleId,
-      },
-      orderBy: {
-        created_at: "asc",
-      },
-    });
-
-    if (firstPhoto) {
-      await tx.photos.update({
-        where: {
-          photo_id: firstPhoto.photo_id,
-        },
-        data: {
-          status: ReviewStatus.Kinnitatud,
-          reviewed_at: new Date(),
-          review_comment: null,
-        },
-      });
-    }
+    await setFirstVehiclePhotoStatus(
+      tx,
+      vehicleId,
+      ReviewStatus.Kinnitatud,
+      reviewerId
+    );
 
     return vehicle;
   });
@@ -785,39 +1148,28 @@ export async function rejectVehicle(
   reviewComment: string
 ) {
   return prisma.$transaction(async (tx) => {
+    await setVehicleReferencesStatus(
+      tx,
+      vehicleId,
+      ReviewStatus.Tagasi_lukatud,
+      reviewerId,
+      reviewComment
+    );
+
     const vehicle = await tx.vehicles.update({
       where: {
         vehicle_id: vehicleId,
       },
-      data: {
-        status: ReviewStatus.Tagasi_lukatud,
-        reviewed_by: reviewerId,
-        reviewed_at: new Date(),
-        review_comment: reviewComment,
-      },
+      data: getRejectedReviewData(reviewerId, reviewComment),
     });
 
-    const firstPhoto = await tx.photos.findFirst({
-      where: {
-        vehicle_id: vehicleId,
-      },
-      orderBy: {
-        created_at: "asc",
-      },
-    });
-
-    if (firstPhoto) {
-      await tx.photos.update({
-        where: {
-          photo_id: firstPhoto.photo_id,
-        },
-        data: {
-          status: ReviewStatus.Tagasi_lukatud,
-          reviewed_at: new Date(),
-          review_comment: reviewComment,
-        },
-      });
-    }
+    await setFirstVehiclePhotoStatus(
+      tx,
+      vehicleId,
+      ReviewStatus.Tagasi_lukatud,
+      reviewerId,
+      reviewComment
+    );
 
     return vehicle;
   });

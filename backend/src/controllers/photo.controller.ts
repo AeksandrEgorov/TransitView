@@ -2,10 +2,8 @@ import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";
 import type { UpdatePhotoBody } from "../types/photo.js";
-import {
-  ReviewStatus,
-  VehicleCondition,
-} from "../generated/prisma/client.js";
+import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
+
 import {
   approvePhoto,
   createPhoto,
@@ -20,13 +18,20 @@ import {
   rejectPhoto,
   updatePhoto,
 } from "../services/photo.service.js";
+
 import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
 import prisma from "../config/prisma.js";
+
 import {
   createPhotoSchema,
   updatePhotoSchema,
 } from "../validators/photo.validator.js";
 import { rejectSchema } from "../validators/moderation.validator.js";
+
+type NewCityInput = {
+  name: string;
+  county_id: number;
+};
 
 function getSingleString(value: unknown): string | undefined {
   if (typeof value === "string") {
@@ -90,9 +95,7 @@ function parseDateQuery(
   return date;
 }
 
-function parseReviewStatus(
-  value: unknown
-): ReviewStatus | undefined | null {
+function parseReviewStatus(value: unknown): ReviewStatus | undefined | null {
   const rawValue = getSingleString(value);
 
   if (!rawValue) {
@@ -122,6 +125,53 @@ function parseVehicleCondition(
   return null;
 }
 
+function parseNewCityInput(body: unknown): NewCityInput | undefined | null {
+  if (!body || typeof body !== "object") {
+    return undefined;
+  }
+
+  const data = body as {
+    new_city?: unknown;
+    new_city_name?: unknown;
+    new_city_county_id?: unknown;
+  };
+
+  if (data.new_city === undefined && data.new_city_name === undefined) {
+    return undefined;
+  }
+
+  if (data.new_city && typeof data.new_city === "object") {
+    const newCity = data.new_city as {
+      name?: unknown;
+      county_id?: unknown;
+    };
+
+    const name = getSingleString(newCity.name)?.trim();
+    const countyId = Number(newCity.county_id);
+
+    if (!name || !Number.isInteger(countyId) || countyId <= 0) {
+      return null;
+    }
+
+    return {
+      name,
+      county_id: countyId,
+    };
+  }
+
+  const name = getSingleString(data.new_city_name)?.trim();
+  const countyId = Number(data.new_city_county_id);
+
+  if (!name || !Number.isInteger(countyId) || countyId <= 0) {
+    return null;
+  }
+
+  return {
+    name,
+    county_id: countyId,
+  };
+}
+
 function isHigherRole(req: AuthRequest) {
   return (
     req.user?.role === "Andmebaasi_toimetaja" ||
@@ -147,6 +197,14 @@ function isPrismaNotFoundError(error: unknown) {
   );
 }
 
+function isProtectedPhotoError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes("Kinnitatud fotot ei saa muuta") ||
+      error.message.includes("Kinnitatud fotot ei saa kustutada"))
+  );
+}
+
 export async function uploadPhotoHandler(
   req: AuthRequest,
   res: Response
@@ -157,7 +215,10 @@ export async function uploadPhotoHandler(
       return;
     }
 
-    const result = await uploadBufferToCloudinary(req.file.buffer, "transitview");
+    const result = await uploadBufferToCloudinary(
+      req.file.buffer,
+      "transitview"
+    );
 
     res.status(200).json({
       message: "Image uploaded successfully",
@@ -176,7 +237,6 @@ export async function getPhotosHandler(
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -286,7 +346,6 @@ export async function getVehiclePhotosHandler(
     }
 
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -316,7 +375,6 @@ export async function getMyPhotosHandler(
     }
 
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -435,6 +493,15 @@ export async function createPhotoHandler(
       return;
     }
 
+    const newCity = parseNewCityInput(req.body);
+
+    if (newCity === null) {
+      res.status(400).json({
+        message: "Invalid new city data",
+      });
+      return;
+    }
+
     const parsed = createPhotoSchema.safeParse(req.body);
 
     if (!parsed.success) {
@@ -470,6 +537,7 @@ export async function createPhotoHandler(
     const photo = await createPhoto({
       vehicle_id: body.vehicle_id,
       city_id: body.city_id,
+      new_city: newCity,
       place: body.place,
       taken_at: body.taken_at,
       file_path: body.file_path,
@@ -511,6 +579,15 @@ export async function updatePhotoHandler(
       return;
     }
 
+    const newCity = parseNewCityInput(req.body);
+
+    if (newCity === null) {
+      res.status(400).json({
+        message: "Invalid new city data",
+      });
+      return;
+    }
+
     const parsed = updatePhotoSchema.safeParse(req.body);
 
     if (!parsed.success) {
@@ -542,7 +619,11 @@ export async function updatePhotoHandler(
       return;
     }
 
-    const updatedPhoto = await updatePhoto(photoId, body);
+    const updatedPhoto = await updatePhoto(photoId, {
+      ...body,
+      new_city: newCity,
+      user_id: req.user.userId,
+    });
 
     if (!updatedPhoto) {
       res.status(404).json({ message: "Photo not found" });
@@ -554,6 +635,13 @@ export async function updatePhotoHandler(
       photo: updatedPhoto,
     });
   } catch (error) {
+    if (isProtectedPhotoError(error)) {
+      res.status(403).json({
+        message: error instanceof Error ? error.message : "Forbidden",
+      });
+      return;
+    }
+
     if (isPrismaForeignKeyError(error)) {
       res.status(400).json({
         message: "Invalid related record id",
@@ -613,6 +701,13 @@ export async function deletePhotoHandler(
       message: "Photo deleted successfully",
     });
   } catch (error) {
+    if (isProtectedPhotoError(error)) {
+      res.status(403).json({
+        message: error instanceof Error ? error.message : "Forbidden",
+      });
+      return;
+    }
+
     if (isPrismaNotFoundError(error)) {
       res.status(404).json({ message: "Photo not found" });
       return;
@@ -629,7 +724,6 @@ export async function getPendingPhotosHandler(
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -649,6 +743,11 @@ export async function approvePhotoHandler(
   res: Response
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
     const photoId = parsePositiveInt(req.params.id);
 
     if (!photoId) {
@@ -656,7 +755,7 @@ export async function approvePhotoHandler(
       return;
     }
 
-    const photo = await approvePhoto(photoId);
+    const photo = await approvePhoto(photoId, req.user.userId);
 
     res.status(200).json({
       message: "Photo approved successfully",
@@ -678,6 +777,11 @@ export async function rejectPhotoHandler(
   res: Response
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
     const photoId = parsePositiveInt(req.params.id);
 
     if (!photoId) {
@@ -695,7 +799,11 @@ export async function rejectPhotoHandler(
       return;
     }
 
-    const photo = await rejectPhoto(photoId, parsed.data.review_comment);
+    const photo = await rejectPhoto(
+      photoId,
+      parsed.data.review_comment,
+      req.user.userId
+    );
 
     res.status(200).json({
       message: "Photo rejected successfully",

@@ -35,15 +35,26 @@ interface GetMyPhotosParams {
   createdTo?: Date;
 }
 
+type NewCityData = {
+  name: string;
+  county_id: number;
+};
+
 interface CreatePhotoData {
   vehicle_id: number;
   city_id?: number | null;
+  new_city?: NewCityData | null;
   place?: string | null;
   taken_at?: string | null;
   file_path: string;
   cloudinary_public_id?: string | null;
   user_id: number;
 }
+
+type UpdatePhotoData = UpdatePhotoBody & {
+  new_city?: NewCityData | null;
+  user_id?: number;
+};
 
 type CountRow = {
   total: bigint | number;
@@ -307,6 +318,123 @@ function mapMyPhotoFromView(row: MyPhotoViewRow) {
   };
 }
 
+function getApprovedReviewData(reviewerId?: number) {
+  return {
+    status: ReviewStatus.Kinnitatud,
+    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
+    reviewed_at: new Date(),
+    review_comment: null,
+  };
+}
+
+function getRejectedReviewData(reviewComment: string, reviewerId?: number) {
+  return {
+    status: ReviewStatus.Tagasi_lukatud,
+    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
+    reviewed_at: new Date(),
+    review_comment: reviewComment,
+  };
+}
+
+function getPendingReviewData() {
+  return {
+    status: ReviewStatus.Ootel,
+    reviewed_by: null,
+    reviewed_at: null,
+    review_comment: null,
+  };
+}
+
+async function resolvePhotoCityId(
+  tx: Prisma.TransactionClient,
+  data: {
+    city_id?: number | null;
+    new_city?: NewCityData | null;
+    user_id: number;
+  }
+) {
+  if (data.new_city?.name && data.new_city.county_id) {
+    const cityName = data.new_city.name.trim();
+
+    const existingCity = await tx.cities.findFirst({
+      where: {
+        county_id: data.new_city.county_id,
+        name: {
+          equals: cityName,
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (existingCity) {
+      if (existingCity.status !== ReviewStatus.Kinnitatud) {
+        await tx.cities.update({
+          where: {
+            city_id: existingCity.city_id,
+          },
+          data: {
+            ...getPendingReviewData(),
+            created_by: data.user_id,
+          },
+        });
+      }
+
+      return existingCity.city_id;
+    }
+
+    const createdCity = await tx.cities.create({
+      data: {
+        county_id: data.new_city.county_id,
+        name: cityName,
+        status: ReviewStatus.Ootel,
+        created_by: data.user_id,
+        review_comment: null,
+      },
+    });
+
+    return createdCity.city_id;
+  }
+
+  return data.city_id ?? null;
+}
+
+async function setPhotoCityStatus(
+  tx: Prisma.TransactionClient,
+  photoId: number,
+  status: ReviewStatus,
+  reviewComment?: string,
+  reviewerId?: number
+) {
+  const photo = await tx.photos.findUnique({
+    where: {
+      photo_id: photoId,
+    },
+    include: {
+      city: true,
+    },
+  });
+
+  if (!photo?.city) {
+    return;
+  }
+
+  if (photo.city.status === ReviewStatus.Kinnitatud) {
+    return;
+  }
+
+  const reviewData =
+    status === ReviewStatus.Kinnitatud
+      ? getApprovedReviewData(reviewerId)
+      : getRejectedReviewData(reviewComment ?? "", reviewerId);
+
+  await tx.cities.update({
+    where: {
+      city_id: photo.city.city_id,
+    },
+    data: reviewData,
+  });
+}
+
 export async function getPublicPhotos(params: GetPublicPhotosParams) {
   const {
     page,
@@ -539,18 +667,26 @@ export async function getMyPhotoById(photoId: number, userId: number) {
 }
 
 export async function createPhoto(data: CreatePhotoData) {
-  return prisma.photos.create({
-    data: {
-      vehicle_id: data.vehicle_id,
-      author_id: data.user_id,
-      city_id: data.city_id ?? null,
-      place: data.place ?? null,
-      taken_at: data.taken_at ? new Date(data.taken_at) : null,
-      file_path: data.file_path,
-      cloudinary_public_id: data.cloudinary_public_id ?? null,
-      status: ReviewStatus.Ootel,
-      review_comment: null,
-    },
+  return prisma.$transaction(async (tx) => {
+    const cityId = await resolvePhotoCityId(tx, {
+      city_id: data.city_id,
+      new_city: data.new_city,
+      user_id: data.user_id,
+    });
+
+    return tx.photos.create({
+      data: {
+        vehicle_id: data.vehicle_id,
+        author_id: data.user_id,
+        city_id: cityId,
+        place: data.place ?? null,
+        taken_at: data.taken_at ? new Date(data.taken_at) : null,
+        file_path: data.file_path,
+        cloudinary_public_id: data.cloudinary_public_id ?? null,
+        status: ReviewStatus.Ootel,
+        review_comment: null,
+      },
+    });
   });
 }
 
@@ -562,76 +698,111 @@ export async function getPhotoForEdit(photoId: number) {
   });
 }
 
-export async function updatePhoto(photoId: number, data: UpdatePhotoBody) {
-  const oldPhoto = await prisma.photos.findUnique({
-    where: {
-      photo_id: photoId,
-    },
+export async function updatePhoto(photoId: number, data: UpdatePhotoData) {
+  const oldCloudinaryPublicId = await prisma.$transaction(async (tx) => {
+    const oldPhoto = await tx.photos.findUnique({
+      where: {
+        photo_id: photoId,
+      },
+    });
+
+    if (!oldPhoto) {
+      return null;
+    }
+
+    if (oldPhoto.status === ReviewStatus.Kinnitatud) {
+      throw new Error("Kinnitatud fotot ei saa muuta.");
+    }
+
+    const userId = data.user_id ?? oldPhoto.author_id;
+
+    const nextCityId =
+      data.city_id !== undefined || data.new_city
+        ? await resolvePhotoCityId(tx, {
+            city_id: data.city_id,
+            new_city: data.new_city,
+            user_id: userId,
+          })
+        : undefined;
+
+    await tx.photos.update({
+      where: {
+        photo_id: photoId,
+      },
+      data: {
+        ...(nextCityId !== undefined ? { city_id: nextCityId } : {}),
+        ...(data.place !== undefined ? { place: data.place } : {}),
+        ...(data.taken_at !== undefined
+          ? {
+              taken_at: data.taken_at ? new Date(data.taken_at) : null,
+            }
+          : {}),
+        ...(data.file_path !== undefined ? { file_path: data.file_path } : {}),
+        ...(data.cloudinary_public_id !== undefined
+          ? { cloudinary_public_id: data.cloudinary_public_id }
+          : {}),
+        ...getPendingReviewData(),
+      },
+    });
+
+    const imageWasReplaced =
+      data.cloudinary_public_id &&
+      oldPhoto.cloudinary_public_id &&
+      data.cloudinary_public_id !== oldPhoto.cloudinary_public_id;
+
+    return imageWasReplaced ? oldPhoto.cloudinary_public_id : null;
   });
 
-  if (!oldPhoto) {
-    return null;
-  }
-
-  const updatedPhoto = await prisma.photos.update({
-    where: {
-      photo_id: photoId,
-    },
-    data: {
-      ...(data.city_id !== undefined ? { city_id: data.city_id } : {}),
-      ...(data.place !== undefined ? { place: data.place } : {}),
-      ...(data.taken_at !== undefined
-        ? { taken_at: data.taken_at ? new Date(data.taken_at) : null }
-        : {}),
-      ...(data.file_path !== undefined ? { file_path: data.file_path } : {}),
-      ...(data.cloudinary_public_id !== undefined
-        ? { cloudinary_public_id: data.cloudinary_public_id }
-        : {}),
-    },
-  });
-
-  const imageWasReplaced =
-    data.cloudinary_public_id &&
-    oldPhoto.cloudinary_public_id &&
-    data.cloudinary_public_id !== oldPhoto.cloudinary_public_id;
-
-  if (imageWasReplaced) {
+  if (oldCloudinaryPublicId) {
     try {
-      await deleteCloudinaryImage(oldPhoto.cloudinary_public_id);
+      await deleteCloudinaryImage(oldCloudinaryPublicId);
     } catch (error) {
       console.error("Failed to delete old Cloudinary image:", error);
     }
   }
 
-  return updatedPhoto;
+  return prisma.photos.findUnique({
+    where: {
+      photo_id: photoId,
+    },
+    include: photoDashboardInclude,
+  });
 }
 
 export async function deletePhoto(photoId: number) {
-  const photo = await prisma.photos.findUnique({
-    where: {
-      photo_id: photoId,
-    },
+  const deletedPhoto = await prisma.$transaction(async (tx) => {
+    const photo = await tx.photos.findUnique({
+      where: {
+        photo_id: photoId,
+      },
+    });
+
+    if (!photo) {
+      return null;
+    }
+
+    if (photo.status === ReviewStatus.Kinnitatud) {
+      throw new Error("Kinnitatud fotot ei saa kustutada.");
+    }
+
+    await tx.photos.delete({
+      where: {
+        photo_id: photoId,
+      },
+    });
+
+    return photo;
   });
 
-  if (!photo) {
-    return null;
-  }
-
-  await prisma.photos.delete({
-    where: {
-      photo_id: photoId,
-    },
-  });
-
-  if (photo.cloudinary_public_id) {
+  if (deletedPhoto?.cloudinary_public_id) {
     try {
-      await deleteCloudinaryImage(photo.cloudinary_public_id);
+      await deleteCloudinaryImage(deletedPhoto.cloudinary_public_id);
     } catch (error) {
       console.error("Failed to delete Cloudinary image:", error);
     }
   }
 
-  return photo;
+  return deletedPhoto;
 }
 
 export async function getPendingPhotos(params: {
@@ -669,28 +840,44 @@ export async function getPendingPhotos(params: {
   };
 }
 
-export async function approvePhoto(photoId: number) {
-  return prisma.photos.update({
-    where: {
-      photo_id: photoId,
-    },
-    data: {
-      status: ReviewStatus.Kinnitatud,
-      reviewed_at: new Date(),
-      review_comment: null,
-    },
+export async function approvePhoto(photoId: number, reviewerId?: number) {
+  return prisma.$transaction(async (tx) => {
+    await setPhotoCityStatus(
+      tx,
+      photoId,
+      ReviewStatus.Kinnitatud,
+      undefined,
+      reviewerId
+    );
+
+    return tx.photos.update({
+      where: {
+        photo_id: photoId,
+      },
+      data: getApprovedReviewData(reviewerId),
+    });
   });
 }
 
-export async function rejectPhoto(photoId: number, reviewComment: string) {
-  return prisma.photos.update({
-    where: {
-      photo_id: photoId,
-    },
-    data: {
-      status: ReviewStatus.Tagasi_lukatud,
-      reviewed_at: new Date(),
-      review_comment: reviewComment,
-    },
+export async function rejectPhoto(
+  photoId: number,
+  reviewComment: string,
+  reviewerId?: number
+) {
+  return prisma.$transaction(async (tx) => {
+    await setPhotoCityStatus(
+      tx,
+      photoId,
+      ReviewStatus.Tagasi_lukatud,
+      reviewComment,
+      reviewerId
+    );
+
+    return tx.photos.update({
+      where: {
+        photo_id: photoId,
+      },
+      data: getRejectedReviewData(reviewComment, reviewerId),
+    });
   });
 }
