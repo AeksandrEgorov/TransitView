@@ -7,6 +7,7 @@ import {
 import type { UpdatePhotoBody } from "../types/photo.js";
 import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
 import { dbView } from "../utils/dbView.js";
+import { cleanupUnusedPhotoReferences } from "./referenceCleanup.service.js";
 
 interface GetPublicPhotosParams {
   page: number;
@@ -770,39 +771,41 @@ export async function updatePhoto(photoId: number, data: UpdatePhotoData) {
 }
 
 export async function deletePhoto(photoId: number) {
-  const deletedPhoto = await prisma.$transaction(async (tx) => {
-    const photo = await tx.photos.findUnique({
-      where: {
-        photo_id: photoId,
-      },
-    });
+  const photo = await prisma.photos.findUnique({
+    where: {
+      photo_id: photoId,
+    },
+  });
 
-    if (!photo) {
-      return null;
-    }
+  if (!photo) {
+    return null;
+  }
 
-    if (photo.status === ReviewStatus.Kinnitatud) {
-      throw new Error("Kinnitatud fotot ei saa kustutada.");
-    }
+  if (photo.status === ReviewStatus.Kinnitatud) {
+    throw new Error("Kinnitatud fotot ei saa kustutada");
+  }
 
+  await prisma.$transaction(async (tx) => {
     await tx.photos.delete({
       where: {
         photo_id: photoId,
       },
     });
 
-    return photo;
+    await cleanupUnusedPhotoReferences(tx, {
+      city_id: photo.city_id,
+    });
   });
 
-  if (deletedPhoto?.cloudinary_public_id) {
+  if (photo.cloudinary_public_id) {
     try {
-      await deleteCloudinaryImage(deletedPhoto.cloudinary_public_id);
+      await deleteCloudinaryImage(photo.cloudinary_public_id);
     } catch (error) {
       console.error("Failed to delete Cloudinary image:", error);
     }
   }
 
-  return deletedPhoto;
+  return photo;
 }
 
 export async function getPendingPhotos(params: {
