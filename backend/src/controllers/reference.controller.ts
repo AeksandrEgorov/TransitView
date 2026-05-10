@@ -68,87 +68,78 @@ export async function getPublicFilters(
   res: Response
 ): Promise<void> {
   try {
-    const [
-      vehicleCategories,
-      vehicleCityRows,
-      vehicleConditionRows,
-      photoCategories,
-      photoCityRows,
-      photoConditionRows,
-    ] = await Promise.all([
-      prisma.$queryRaw<CategoryRow[]>`
-        SELECT DISTINCT
-          v.category_id,
-          v.category_name AS name
+    const vehicleCategories = await prisma.$queryRaw<CategoryRow[]>`
+      SELECT DISTINCT
+        v.category_id,
+        v.category_name AS name
+      FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+      WHERE v.category_id IS NOT NULL
+      ORDER BY name ASC
+    `;
+
+    const vehicleCityRows = await prisma.$queryRaw<CityRow[]>`
+      SELECT DISTINCT
+        location_rows.city_id,
+        location_rows.name,
+        location_rows.county_id,
+        location_rows.county_name
+      FROM (
+        SELECT
+          v.branch_city_id AS city_id,
+          v.branch_city_name AS name,
+          v.branch_county_id AS county_id,
+          v.branch_county_name AS county_name
         FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
-        WHERE v.category_id IS NOT NULL
-        ORDER BY name ASC
-      `,
+        WHERE v.branch_city_id IS NOT NULL
 
-      prisma.$queryRaw<CityRow[]>`
-        SELECT DISTINCT
-          location_rows.city_id,
-          location_rows.name,
-          location_rows.county_id,
-          location_rows.county_name
-        FROM (
-          SELECT
-            v.branch_city_id AS city_id,
-            v.branch_city_name AS name,
-            v.branch_county_id AS county_id,
-            v.branch_county_name AS county_name
-          FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
-          WHERE v.branch_city_id IS NOT NULL
+        UNION
 
-          UNION
-
-          SELECT
-            p.city_id AS city_id,
-            p.city_name AS name,
-            p.county_id AS county_id,
-            p.county_name AS county_name
-          FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
-          WHERE p.city_id IS NOT NULL
-        ) location_rows
-        ORDER BY location_rows.name ASC
-      `,
-
-      prisma.$queryRaw<ConditionRow[]>`
-        SELECT DISTINCT
-          v.condition::text AS condition
-        FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
-        WHERE v.condition IS NOT NULL
-        ORDER BY condition ASC
-      `,
-
-      prisma.$queryRaw<CategoryRow[]>`
-        SELECT DISTINCT
-          p.category_id,
-          p.category_name AS name
-        FROM ${Prisma.raw(dbView("v_public_photos"))} p
-        WHERE p.category_id IS NOT NULL
-        ORDER BY name ASC
-      `,
-
-      prisma.$queryRaw<CityRow[]>`
-        SELECT DISTINCT
-          p.city_id,
+        SELECT
+          p.city_id AS city_id,
           p.city_name AS name,
-          p.county_id,
-          p.county_name
-        FROM ${Prisma.raw(dbView("v_public_photos"))} p
+          p.county_id AS county_id,
+          p.county_name AS county_name
+        FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
         WHERE p.city_id IS NOT NULL
-        ORDER BY p.city_name ASC
-      `,
+      ) location_rows
+      ORDER BY location_rows.name ASC
+    `;
 
-      prisma.$queryRaw<ConditionRow[]>`
-        SELECT DISTINCT
-          p.vehicle_condition::text AS condition
-        FROM ${Prisma.raw(dbView("v_public_photos"))} p
-        WHERE p.vehicle_condition IS NOT NULL
-        ORDER BY condition ASC
-      `,
-    ]);
+    const vehicleConditionRows = await prisma.$queryRaw<ConditionRow[]>`
+      SELECT DISTINCT
+        v.condition::text AS condition
+      FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+      WHERE v.condition IS NOT NULL
+      ORDER BY condition ASC
+    `;
+
+    const photoCategories = await prisma.$queryRaw<CategoryRow[]>`
+      SELECT DISTINCT
+        p.category_id,
+        p.category_name AS name
+      FROM ${Prisma.raw(dbView("v_public_photos"))} p
+      WHERE p.category_id IS NOT NULL
+      ORDER BY name ASC
+    `;
+
+    const photoCityRows = await prisma.$queryRaw<CityRow[]>`
+      SELECT DISTINCT
+        p.city_id,
+        p.city_name AS name,
+        p.county_id,
+        p.county_name
+      FROM ${Prisma.raw(dbView("v_public_photos"))} p
+      WHERE p.city_id IS NOT NULL
+      ORDER BY p.city_name ASC
+    `;
+
+    const photoConditionRows = await prisma.$queryRaw<ConditionRow[]>`
+      SELECT DISTINCT
+        p.vehicle_condition::text AS condition
+      FROM ${Prisma.raw(dbView("v_public_photos"))} p
+      WHERE p.vehicle_condition IS NOT NULL
+      ORDER BY condition ASC
+    `;
 
     res.status(200).json({
       vehicleFilters: {
@@ -182,76 +173,67 @@ export async function getMyFilters(
 
     const userId = req.user.userId;
 
-    const [
-      vehicleCategories,
-      vehicleCityRows,
-      vehicleConditionRows,
-      photoCategories,
-      photoCityRows,
-      photoConditionRows,
-    ] = await Promise.all([
-      prisma.$queryRaw<CategoryRow[]>`
-        SELECT DISTINCT
-          v.category_id,
-          v.category_name AS name
-        FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
-        WHERE v.created_by = ${userId}
-          AND v.category_id IS NOT NULL
-        ORDER BY name ASC
-      `,
+    const vehicleCategories = await prisma.$queryRaw<CategoryRow[]>`
+      SELECT DISTINCT
+        v.category_id,
+        v.category_name AS name
+      FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
+      WHERE v.created_by = ${userId}
+        AND v.category_id IS NOT NULL
+      ORDER BY name ASC
+    `;
 
-      prisma.$queryRaw<CityRow[]>`
-        SELECT DISTINCT
-          p.city_id,
-          p.city_name AS name,
-          p.county_id,
-          p.county_name
-        FROM ${Prisma.raw(dbView("v_my_photos"))} p
-        WHERE p.vehicle_created_by = ${userId}
-          AND p.city_id IS NOT NULL
-        ORDER BY p.city_name ASC
-      `,
+    const vehicleCityRows = await prisma.$queryRaw<CityRow[]>`
+      SELECT DISTINCT
+        p.city_id,
+        p.city_name AS name,
+        p.county_id,
+        p.county_name
+      FROM ${Prisma.raw(dbView("v_my_photos"))} p
+      WHERE p.vehicle_created_by = ${userId}
+        AND p.city_id IS NOT NULL
+      ORDER BY p.city_name ASC
+    `;
 
-      prisma.$queryRaw<ConditionRow[]>`
-        SELECT DISTINCT
-          v.condition::text AS condition
-        FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
-        WHERE v.created_by = ${userId}
-          AND v.condition IS NOT NULL
-        ORDER BY condition ASC
-      `,
+    const vehicleConditionRows = await prisma.$queryRaw<ConditionRow[]>`
+      SELECT DISTINCT
+        v.condition::text AS condition
+      FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
+      WHERE v.created_by = ${userId}
+        AND v.condition IS NOT NULL
+      ORDER BY condition ASC
+    `;
 
-      prisma.$queryRaw<CategoryRow[]>`
-        SELECT DISTINCT
-          p.category_id,
-          p.category_name AS name
-        FROM ${Prisma.raw(dbView("v_my_photos"))} p
-        WHERE p.author_id = ${userId}
-          AND p.category_id IS NOT NULL
-        ORDER BY name ASC
-      `,
+    const photoCategories = await prisma.$queryRaw<CategoryRow[]>`
+      SELECT DISTINCT
+        p.category_id,
+        p.category_name AS name
+      FROM ${Prisma.raw(dbView("v_my_photos"))} p
+      WHERE p.author_id = ${userId}
+        AND p.category_id IS NOT NULL
+      ORDER BY name ASC
+    `;
 
-      prisma.$queryRaw<CityRow[]>`
-        SELECT DISTINCT
-          p.city_id,
-          p.city_name AS name,
-          p.county_id,
-          p.county_name
-        FROM ${Prisma.raw(dbView("v_my_photos"))} p
-        WHERE p.author_id = ${userId}
-          AND p.city_id IS NOT NULL
-        ORDER BY p.city_name ASC
-      `,
+    const photoCityRows = await prisma.$queryRaw<CityRow[]>`
+      SELECT DISTINCT
+        p.city_id,
+        p.city_name AS name,
+        p.county_id,
+        p.county_name
+      FROM ${Prisma.raw(dbView("v_my_photos"))} p
+      WHERE p.author_id = ${userId}
+        AND p.city_id IS NOT NULL
+      ORDER BY p.city_name ASC
+    `;
 
-      prisma.$queryRaw<ConditionRow[]>`
-        SELECT DISTINCT
-          p.vehicle_condition::text AS condition
-        FROM ${Prisma.raw(dbView("v_my_photos"))} p
-        WHERE p.author_id = ${userId}
-          AND p.vehicle_condition IS NOT NULL
-        ORDER BY condition ASC
-      `,
-    ]);
+    const photoConditionRows = await prisma.$queryRaw<ConditionRow[]>`
+      SELECT DISTINCT
+        p.vehicle_condition::text AS condition
+      FROM ${Prisma.raw(dbView("v_my_photos"))} p
+      WHERE p.author_id = ${userId}
+        AND p.vehicle_condition IS NOT NULL
+      ORDER BY condition ASC
+    `;
 
     res.status(200).json({
       vehicleFilters: {

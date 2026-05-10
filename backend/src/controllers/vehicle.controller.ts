@@ -1,9 +1,13 @@
 import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";
-import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
 import {
-  approveVehicle,
+  Prisma,
+  ReviewStatus,
+  VehicleCondition,
+} from "../generated/prisma/client.js";
+
+import {
   createVehicleWithFirstPhoto,
   deleteVehicle,
   getMyVehicleById,
@@ -12,15 +16,15 @@ import {
   getPublicVehicles,
   getVehicleById,
   getVehicleForEdit,
-  rejectVehicle,
   updateVehicle,
 } from "../services/vehicle.service.js";
+
 import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
+
 import {
   createVehicleSchema,
   updateVehicleSchema,
 } from "../validators/vehicle.validator.js";
-import { rejectSchema } from "../validators/moderation.validator.js";
 
 function getSingleString(value: unknown): string | undefined {
   if (typeof value === "string") {
@@ -121,30 +125,10 @@ function isHigherRole(req: AuthRequest) {
   );
 }
 
-function isPrismaUniqueError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2002"
-  );
-}
-
 function isPrismaForeignKeyError(error: unknown) {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2003"
-  );
-}
-
-function isPrismaNotFoundError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2025"
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2003"
   );
 }
 
@@ -156,13 +140,80 @@ function isProtectedVehicleError(error: unknown) {
   );
 }
 
+function isDuplicateVehicleRegNumberError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("Vehicle with this registration number already exists")
+  );
+}
+
+function getPrismaUniqueFields(error: Prisma.PrismaClientKnownRequestError) {
+  const target = error.meta?.target;
+
+  if (Array.isArray(target)) {
+    return target.map(String);
+  }
+
+  if (typeof target === "string") {
+    return [target];
+  }
+
+  return [];
+}
+
+function getUniqueErrorMessage(error: unknown) {
+  if (isDuplicateVehicleRegNumberError(error)) {
+    return "Vehicle with this registration number already exists";
+  }
+
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2002"
+  ) {
+    return null;
+  }
+
+  const fields = getPrismaUniqueFields(error);
+
+  console.error("Vehicle unique constraint error fields:", fields);
+
+  if (fields.includes("reg_number")) {
+    return "Vehicle with this registration number already exists";
+  }
+
+  if (fields.includes("email")) {
+    return "Sellise e-postiga kirje on juba olemas";
+  }
+
+  if (fields.includes("username")) {
+    return "Sellise kasutajanimega kirje on juba olemas";
+  }
+
+  if (fields.includes("manufacturer") || fields.includes("model_name")) {
+    return "Selline mudel on juba olemas";
+  }
+
+  if (fields.includes("company_id") || fields.includes("branch_name")) {
+    return "Selline filiaal on juba olemas";
+  }
+
+  if (fields.includes("county_id") || fields.includes("city_id")) {
+    return "Selline asukoht on juba olemas";
+  }
+
+  if (fields.includes("name")) {
+    return "Sellise nimega kirje on juba olemas";
+  }
+
+  return "Selline kirje on juba olemas";
+}
+
 export async function getVehicles(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -276,7 +327,6 @@ export async function getMyVehiclesHandler(
     }
 
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
@@ -372,7 +422,9 @@ export async function getMyVehicleHandler(
     const vehicle = await getMyVehicleById(vehicleId, req.user.userId);
 
     if (!vehicle) {
-      res.status(404).json({ message: "Vehicle not found" });
+      res.status(404).json({
+        message: "Vehicle not found or you do not have access to it",
+      });
       return;
     }
 
@@ -387,6 +439,8 @@ export async function createVehicleHandler(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
+  let uploadedCloudinaryPublicId: string | null = null;
+
   try {
     if (!req.user) {
       res.status(401).json({ message: "Authentication required" });
@@ -394,9 +448,7 @@ export async function createVehicleHandler(
     }
 
     if (!req.file) {
-      res.status(400).json({
-        message: "Vehicle first photo is required",
-      });
+      res.status(400).json({ message: "Image file is required" });
       return;
     }
 
@@ -410,42 +462,15 @@ export async function createVehicleHandler(
       return;
     }
 
-    const body = parsed.data;
+    const uploadedImage = await uploadBufferToCloudinary(
+      req.file.buffer,
+      "transitview"
+    );
 
-    const uploadedImage = await uploadBufferToCloudinary(req.file.buffer);
+    uploadedCloudinaryPublicId = uploadedImage.public_id;
 
     const result = await createVehicleWithFirstPhoto({
-      model_id: body.model_id,
-      new_model_manufacturer: body.new_model_manufacturer,
-      new_model_name: body.new_model_name,
-      new_model_category_id: body.new_model_category_id,
-
-      branch_id: body.branch_id,
-      new_branch_name: body.new_branch_name,
-
-      new_branch_company_id: body.new_branch_company_id,
-
-      new_company_name: body.new_company_name,
-      new_company_city_id: body.new_company_city_id,
-      new_company_city_name: body.new_company_city_name,
-      new_company_city_county_id: body.new_company_city_county_id,
-
-      new_branch_city_id: body.new_branch_city_id,
-      new_branch_city_name: body.new_branch_city_name,
-      new_branch_city_county_id: body.new_branch_city_county_id,
-
-      reg_number: body.reg_number,
-      vla_year: body.vla_year,
-      vin_code: body.vin_code,
-      chassis: body.chassis,
-      condition: body.condition,
-
-      city_id: body.city_id,
-      new_city_name: body.new_city_name,
-      new_city_county_id: body.new_city_county_id,
-
-      place: body.place,
-      taken_at: body.taken_at,
+      ...parsed.data,
       file_path: uploadedImage.secure_url,
       cloudinary_public_id: uploadedImage.public_id,
       user_id: req.user.userId,
@@ -453,12 +478,15 @@ export async function createVehicleHandler(
 
     res.status(201).json({
       message: "Vehicle created successfully",
-      ...result,
+      vehicle: result.vehicle,
+      photo: result.photo,
     });
   } catch (error) {
-    if (isPrismaUniqueError(error)) {
+    const uniqueMessage = getUniqueErrorMessage(error);
+
+    if (uniqueMessage) {
       res.status(409).json({
-        message: "Vehicle with this registration number already exists",
+        message: uniqueMessage,
       });
       return;
     }
@@ -502,31 +530,38 @@ export async function updateVehicleHandler(
       return;
     }
 
-    const existingVehicle = await getVehicleForEdit(vehicleId);
-
-    if (!existingVehicle) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    if (!isHigherRole(req) && existingVehicle.created_by !== req.user.userId) {
-      res.status(403).json({ message: "Forbidden" });
-      return;
-    }
-
-    const vehicle = await updateVehicle(vehicleId, {
-      ...parsed.data,
-      user_id: req.user.userId,
-    });
+    const vehicle = await getVehicleForEdit(vehicleId);
 
     if (!vehicle) {
       res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
+    const isOwner = vehicle.created_by === req.user.userId;
+
+    const ownerCanEdit =
+      isOwner &&
+      (vehicle.status === ReviewStatus.Ootel ||
+        vehicle.status === ReviewStatus.Tagasi_lukatud);
+
+    if (!isHigherRole(req) && !ownerCanEdit) {
+      res.status(403).json({ message: "You cannot edit this vehicle" });
+      return;
+    }
+
+    const updatedVehicle = await updateVehicle(vehicleId, {
+      ...parsed.data,
+      user_id: req.user.userId,
+    });
+
+    if (!updatedVehicle) {
+      res.status(404).json({ message: "Vehicle not found" });
+      return;
+    }
+
     res.status(200).json({
       message: "Vehicle updated successfully",
-      vehicle,
+      vehicle: updatedVehicle,
     });
   } catch (error) {
     if (isProtectedVehicleError(error)) {
@@ -536,9 +571,11 @@ export async function updateVehicleHandler(
       return;
     }
 
-    if (isPrismaUniqueError(error)) {
+    const uniqueMessage = getUniqueErrorMessage(error);
+
+    if (uniqueMessage) {
       res.status(409).json({
-        message: "Vehicle with this registration number already exists",
+        message: uniqueMessage,
       });
       return;
     }
@@ -547,11 +584,6 @@ export async function updateVehicleHandler(
       res.status(400).json({
         message: "Invalid related record id",
       });
-      return;
-    }
-
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
@@ -577,15 +609,22 @@ export async function deleteVehicleHandler(
       return;
     }
 
-    const existingVehicle = await getVehicleForEdit(vehicleId);
+    const vehicle = await getVehicleForEdit(vehicleId);
 
-    if (!existingVehicle) {
+    if (!vehicle) {
       res.status(404).json({ message: "Vehicle not found" });
       return;
     }
 
-    if (!isHigherRole(req) && existingVehicle.created_by !== req.user.userId) {
-      res.status(403).json({ message: "Forbidden" });
+    const isOwner = vehicle.created_by === req.user.userId;
+
+    const ownerCanDelete =
+      isOwner &&
+      (vehicle.status === ReviewStatus.Ootel ||
+        vehicle.status === ReviewStatus.Tagasi_lukatud);
+
+    if (!isHigherRole(req) && !ownerCanDelete) {
+      res.status(403).json({ message: "You cannot delete this vehicle" });
       return;
     }
 
@@ -618,102 +657,16 @@ export async function getPendingVehiclesHandler(
 ): Promise<void> {
   try {
     const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
-
     const limit = Math.min(
       Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
     );
 
-    const result = await getPendingVehicles({
-      page,
-      limit,
-    });
+    const result = await getPendingVehicles({ page, limit });
 
     res.status(200).json(result);
   } catch (error) {
     console.error("Get pending vehicles error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
-export async function approveVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-  try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
-    const vehicleId = parsePositiveInt(req.params.id);
-
-    if (!vehicleId) {
-      res.status(400).json({ message: "Invalid vehicle id" });
-      return;
-    }
-
-    const vehicle = await approveVehicle(vehicleId, req.user.userId);
-
-    res.status(200).json({
-      message: "Vehicle approved successfully",
-      vehicle,
-    });
-  } catch (error) {
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    console.error("Approve vehicle error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
-export async function rejectVehicleHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-  try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
-    const vehicleId = parsePositiveInt(req.params.id);
-
-    if (!vehicleId) {
-      res.status(400).json({ message: "Invalid vehicle id" });
-      return;
-    }
-
-    const parsed = rejectSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-      return;
-    }
-
-    const vehicle = await rejectVehicle(
-      vehicleId,
-      req.user.userId,
-      parsed.data.review_comment
-    );
-
-    res.status(200).json({
-      message: "Vehicle rejected successfully",
-      vehicle,
-    });
-  } catch (error) {
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Vehicle not found" });
-      return;
-    }
-
-    console.error("Reject vehicle error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
