@@ -555,3 +555,46 @@ export async function rejectManagePhoto(
     });
   });
 }
+
+export async function pendingManagePhoto(photoId: number) {
+  return prisma.$transaction(async (tx) => {
+    const currentPhoto = await tx.photos.findUnique({
+      where: {
+        photo_id: photoId,
+      },
+      include: {
+        city: true,
+      },
+    });
+
+    if (!currentPhoto) {
+      return null;
+    }
+
+    const pendingData = {
+      status: ReviewStatus.Ootel,
+      reviewed_by: null,
+      reviewed_at: null,
+      review_comment: null,
+    };
+
+    if (
+      currentPhoto.city &&
+      currentPhoto.city.status !== ReviewStatus.Kinnitatud
+    ) {
+      await tx.cities.update({
+        where: {
+          city_id: currentPhoto.city.city_id,
+        },
+        data: pendingData,
+      });
+    }
+
+    return tx.photos.update({
+      where: {
+        photo_id: photoId,
+      },
+      data: pendingData,
+    });
+  });
+}

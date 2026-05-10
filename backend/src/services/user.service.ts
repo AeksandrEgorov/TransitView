@@ -14,16 +14,15 @@ type AdminUserViewRow = {
   role: string;
   created_at: Date;
 
-  vehicles_count: number | bigint;
-  photos_count: number | bigint;
+  vehicles_total: number | bigint;
+  vehicles_pending: number | bigint;
+  vehicles_confirmed: number | bigint;
+  vehicles_rejected: number | bigint;
 
-  pending_vehicles_count: number | bigint;
-  confirmed_vehicles_count: number | bigint;
-  rejected_vehicles_count: number | bigint;
-
-  pending_photos_count: number | bigint;
-  confirmed_photos_count: number | bigint;
-  rejected_photos_count: number | bigint;
+  photos_total: number | bigint;
+  photos_pending: number | bigint;
+  photos_confirmed: number | bigint;
+  photos_rejected: number | bigint;
 };
 
 type CreateUserData = {
@@ -53,6 +52,16 @@ function toNumber(value: number | bigint | null | undefined) {
 }
 
 function mapAdminUserFromView(row: AdminUserViewRow) {
+  const vehiclesTotal = toNumber(row.vehicles_total);
+  const vehiclesPending = toNumber(row.vehicles_pending);
+  const vehiclesConfirmed = toNumber(row.vehicles_confirmed);
+  const vehiclesRejected = toNumber(row.vehicles_rejected);
+
+  const photosTotal = toNumber(row.photos_total);
+  const photosPending = toNumber(row.photos_pending);
+  const photosConfirmed = toNumber(row.photos_confirmed);
+  const photosRejected = toNumber(row.photos_rejected);
+
   return {
     user_id: row.user_id,
     username: row.username,
@@ -60,16 +69,24 @@ function mapAdminUserFromView(row: AdminUserViewRow) {
     role: row.role as UserRole,
     created_at: row.created_at,
 
-    vehicles_count: toNumber(row.vehicles_count),
-    photos_count: toNumber(row.photos_count),
+    vehicles_total: vehiclesTotal,
+    vehicles_pending: vehiclesPending,
+    vehicles_confirmed: vehiclesConfirmed,
+    vehicles_rejected: vehiclesRejected,
 
-    pending_vehicles_count: toNumber(row.pending_vehicles_count),
-    confirmed_vehicles_count: toNumber(row.confirmed_vehicles_count),
-    rejected_vehicles_count: toNumber(row.rejected_vehicles_count),
+    photos_total: photosTotal,
+    photos_pending: photosPending,
+    photos_confirmed: photosConfirmed,
+    photos_rejected: photosRejected,
 
-    pending_photos_count: toNumber(row.pending_photos_count),
-    confirmed_photos_count: toNumber(row.confirmed_photos_count),
-    rejected_photos_count: toNumber(row.rejected_photos_count),
+    vehicles_count: vehiclesTotal,
+    photos_count: photosTotal,
+    pending_vehicles_count: vehiclesPending,
+    confirmed_vehicles_count: vehiclesConfirmed,
+    rejected_vehicles_count: vehiclesRejected,
+    pending_photos_count: photosPending,
+    confirmed_photos_count: photosConfirmed,
+    rejected_photos_count: photosRejected,
   };
 }
 

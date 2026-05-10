@@ -11,6 +11,7 @@ import {
   deleteManagePhoto,
   getManagePhotoById,
   getManagePhotos,
+  pendingManagePhoto,
   rejectManagePhoto,
   updateManagePhoto,
 } from "../services/photoManage.service.js";
@@ -419,6 +420,40 @@ export async function rejectManagePhotoHandler(
     }
 
     console.error("Reject manage photo error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function pendingManagePhotoHandler(
+  req: AuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    const photoId = Number(req.params.id);
+
+    if (!Number.isInteger(photoId) || photoId <= 0) {
+      res.status(400).json({ message: "Invalid photo id" });
+      return;
+    }
+
+    const photo = await pendingManagePhoto(photoId);
+
+    if (!photo) {
+      res.status(404).json({ message: "Photo not found" });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Photo moved to pending successfully",
+      photo,
+    });
+  } catch (error) {
+    console.error("Move photo to pending error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
