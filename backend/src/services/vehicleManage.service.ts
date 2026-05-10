@@ -417,11 +417,20 @@ async function setFirstVehiclePhotoStatus(
     return;
   }
 
-  const reviewData = getPhotoReviewData({
-    status,
-    reviewerId,
-    reviewComment,
-  });
+  const reviewData =
+    status === ReviewStatus.Kinnitatud
+      ? {
+          status: ReviewStatus.Kinnitatud,
+          reviewed_by: reviewerId,
+          reviewed_at: new Date(),
+          review_comment: null,
+        }
+      : {
+          status: ReviewStatus.Tagasi_lukatud,
+          reviewed_by: reviewerId,
+          reviewed_at: new Date(),
+          review_comment: reviewComment?.trim() || null,
+        };
 
   if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
     await tx.cities.update({
@@ -432,17 +441,12 @@ async function setFirstVehiclePhotoStatus(
     });
   }
 
-  if (
-    status === ReviewStatus.Kinnitatud ||
-    firstPhoto.status !== ReviewStatus.Kinnitatud
-  ) {
-    await tx.photos.update({
-      where: {
-        photo_id: firstPhoto.photo_id,
-      },
-      data: reviewData,
-    });
-  }
+  await tx.photos.update({
+    where: {
+      photo_id: firstPhoto.photo_id,
+    },
+    data: reviewData,
+  });
 }
 
 export async function getManageVehicles(params: GetManageVehiclesParams) {
@@ -695,6 +699,48 @@ export async function rejectManageVehicle(
       reviewerId,
       reviewComment
     );
+
+    return vehicle;
+  });
+}
+
+export async function pendingManageVehicle(vehicleId: number) {
+  return prisma.$transaction(async (tx) => {
+    const vehicle = await tx.vehicles.update({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      data: {
+        status: ReviewStatus.Ootel,
+        reviewed_by: null,
+        reviewed_at: null,
+        review_comment: null,
+      },
+      include: manageVehicleDetailInclude,
+    });
+
+    const firstPhoto = await tx.photos.findFirst({
+      where: {
+        vehicle_id: vehicleId,
+      },
+      orderBy: {
+        created_at: "asc",
+      },
+    });
+
+    if (firstPhoto) {
+      await tx.photos.update({
+        where: {
+          photo_id: firstPhoto.photo_id,
+        },
+        data: {
+          status: ReviewStatus.Ootel,
+          reviewed_by: null,
+          reviewed_at: null,
+          review_comment: null,
+        },
+      });
+    }
 
     return vehicle;
   });

@@ -13,6 +13,7 @@ import { requireRole } from "../middleware/role.middleware.js";
 const router = Router();
 
 router.use(requireAuth);
+router.use(requireRole("Andmebaasi_toimetaja", "Administraator"));
 
 router.get("/", getUsersHandler);
 router.get("/:id", getUserHandler);

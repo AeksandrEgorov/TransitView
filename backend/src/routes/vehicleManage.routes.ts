@@ -4,6 +4,7 @@ import {
   approveManageVehicleHandler,
   getManageVehicleHandler,
   getManageVehiclesHandler,
+  pendingManageVehicleHandler,
   rejectManageVehicleHandler,
 } from "../controllers/vehicleManage.controller.js";
 
@@ -28,5 +29,6 @@ router.delete("/:id", deleteVehicleHandler);
 
 router.patch("/:id/approve", approveManageVehicleHandler);
 router.patch("/:id/reject", rejectManageVehicleHandler);
+router.patch("/:id/pending", pendingManageVehicleHandler);
 
 export default router;

@@ -4,6 +4,7 @@ import {
   approveManagePhotoHandler,
   getManagePhotoHandler,
   getManagePhotosHandler,
+  pendingManagePhotoHandler,
   rejectManagePhotoHandler,
 } from "../controllers/photoManage.controller.js";
 
@@ -29,5 +30,6 @@ router.delete("/:id", deletePhotoHandler);
 
 router.patch("/:id/approve", approveManagePhotoHandler);
 router.patch("/:id/reject", rejectManagePhotoHandler);
+router.patch("/:id/pending", pendingManagePhotoHandler);
 
 export default router;

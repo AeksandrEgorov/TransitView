@@ -735,6 +735,47 @@ async function resetVehicleReferencesToPending(
   }
 }
 
+async function resetFirstVehiclePhotoToPending(
+  tx: Prisma.TransactionClient,
+  vehicleId: number
+) {
+  const firstPhoto = await tx.photos.findFirst({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    orderBy: {
+      created_at: "asc",
+    },
+    include: {
+      city: true,
+    },
+  });
+
+  if (!firstPhoto) {
+    return;
+  }
+
+  if (firstPhoto.status === ReviewStatus.Kinnitatud) {
+    return;
+  }
+
+  if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
+    await tx.cities.update({
+      where: {
+        city_id: firstPhoto.city.city_id,
+      },
+      data: getPendingReviewData(),
+    });
+  }
+
+  await tx.photos.update({
+    where: {
+      photo_id: firstPhoto.photo_id,
+    },
+    data: getPendingReviewData(),
+  });
+}
+
 async function setFirstVehiclePhotoStatus(
   tx: Prisma.TransactionClient,
   vehicleId: number,
@@ -1208,6 +1249,7 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleData) 
     });
 
     await resetVehicleReferencesToPending(tx, vehicleId);
+    await resetFirstVehiclePhotoToPending(tx, vehicleId);
 
     await cleanupUnusedVehicleReferences(tx, {
       model_id: currentVehicle.model_id,

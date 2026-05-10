@@ -8,6 +8,7 @@ import {
   deleteManageVehicle,
   getManageVehicleById,
   getManageVehicles,
+  pendingManageVehicle,
   rejectManageVehicle,
   updateManageVehicle,
 } from "../services/vehicleManage.service.js";
@@ -386,5 +387,48 @@ export async function rejectManageVehicleHandler(
     res.json(vehicle);
   } catch (error) {
     next(error);
+  }
+}
+
+function isPrismaNotFoundError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2025"
+  );
+}
+
+export async function pendingManageVehicleHandler(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    const vehicleId = Number(req.params.id);
+
+    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
+      res.status(400).json({ message: "Invalid vehicle id" });
+      return;
+    }
+
+    const vehicle = await pendingManageVehicle(vehicleId);
+
+    res.status(200).json({
+      message: "Vehicle moved to pending successfully",
+      vehicle,
+    });
+  } catch (error) {
+    if (isPrismaNotFoundError(error)) {
+      res.status(404).json({ message: "Vehicle not found" });
+      return;
+    }
+
+    console.error("Move vehicle to pending error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 }
