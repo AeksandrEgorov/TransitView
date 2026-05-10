@@ -319,24 +319,6 @@ function mapMyPhotoFromView(row: MyPhotoViewRow) {
   };
 }
 
-function getApprovedReviewData(reviewerId?: number) {
-  return {
-    status: ReviewStatus.Kinnitatud,
-    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
-    reviewed_at: new Date(),
-    review_comment: null,
-  };
-}
-
-function getRejectedReviewData(reviewComment: string, reviewerId?: number) {
-  return {
-    status: ReviewStatus.Tagasi_lukatud,
-    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
-    reviewed_at: new Date(),
-    review_comment: reviewComment,
-  };
-}
-
 function getPendingReviewData() {
   return {
     status: ReviewStatus.Ootel,
@@ -399,43 +381,6 @@ async function resolvePhotoCityId(
   return data.city_id ?? null;
 }
 
-async function setPhotoCityStatus(
-  tx: Prisma.TransactionClient,
-  photoId: number,
-  status: ReviewStatus,
-  reviewComment?: string,
-  reviewerId?: number
-) {
-  const photo = await tx.photos.findUnique({
-    where: {
-      photo_id: photoId,
-    },
-    include: {
-      city: true,
-    },
-  });
-
-  if (!photo?.city) {
-    return;
-  }
-
-  if (photo.city.status === ReviewStatus.Kinnitatud) {
-    return;
-  }
-
-  const reviewData =
-    status === ReviewStatus.Kinnitatud
-      ? getApprovedReviewData(reviewerId)
-      : getRejectedReviewData(reviewComment ?? "", reviewerId);
-
-  await tx.cities.update({
-    where: {
-      city_id: photo.city.city_id,
-    },
-    data: reviewData,
-  });
-}
-
 export async function getPublicPhotos(params: GetPublicPhotosParams) {
   const {
     page,
@@ -490,22 +435,20 @@ export async function getPublicPhotos(params: GetPublicPhotosParams) {
       ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
       : Prisma.empty;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<PublicPhotoViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_public_photos"))} p
-      ${whereSql}
-      ORDER BY p.created_at DESC, p.photo_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<PublicPhotoViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_public_photos"))} p
+    ${whereSql}
+    ORDER BY p.created_at DESC, p.photo_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_public_photos"))} p
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_public_photos"))} p
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -545,22 +488,20 @@ export async function getPhotosByVehicleId(params: {
   const { vehicleId, page, limit } = params;
   const skip = (page - 1) * limit;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<PublicVehiclePhotoViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
-      WHERE p.vehicle_id = ${vehicleId}
-      ORDER BY p.created_at ASC, p.photo_id ASC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<PublicVehiclePhotoViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
+    WHERE p.vehicle_id = ${vehicleId}
+    ORDER BY p.created_at ASC, p.photo_id ASC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
-      WHERE p.vehicle_id = ${vehicleId}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
+    WHERE p.vehicle_id = ${vehicleId}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -627,22 +568,20 @@ export async function getMyPhotos(params: GetMyPhotosParams) {
 
   const whereSql = Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<MyPhotoViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_my_photos"))} p
-      ${whereSql}
-      ORDER BY p.created_at DESC, p.photo_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<MyPhotoViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_my_photos"))} p
+    ${whereSql}
+    ORDER BY p.created_at DESC, p.photo_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_my_photos"))} p
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_my_photos"))} p
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -825,18 +764,17 @@ export async function getPendingPhotos(params: {
     status: ReviewStatus.Ootel,
   };
 
-  const [items, total] = await Promise.all([
-    prisma.photos.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: {
-        created_at: "asc",
-      },
-      include: photoDashboardInclude,
-    }),
-    prisma.photos.count({ where }),
-  ]);
+  const items = await prisma.photos.findMany({
+    where,
+    skip,
+    take: limit,
+    orderBy: {
+      created_at: "asc",
+    },
+    include: photoDashboardInclude,
+  });
+
+  const total = await prisma.photos.count({ where });
 
   return {
     items,
@@ -847,46 +785,4 @@ export async function getPendingPhotos(params: {
       totalPages: Math.ceil(total / limit),
     },
   };
-}
-
-export async function approvePhoto(photoId: number, reviewerId?: number) {
-  return prisma.$transaction(async (tx) => {
-    await setPhotoCityStatus(
-      tx,
-      photoId,
-      ReviewStatus.Kinnitatud,
-      undefined,
-      reviewerId
-    );
-
-    return tx.photos.update({
-      where: {
-        photo_id: photoId,
-      },
-      data: getApprovedReviewData(reviewerId),
-    });
-  });
-}
-
-export async function rejectPhoto(
-  photoId: number,
-  reviewComment: string,
-  reviewerId?: number
-) {
-  return prisma.$transaction(async (tx) => {
-    await setPhotoCityStatus(
-      tx,
-      photoId,
-      ReviewStatus.Tagasi_lukatud,
-      reviewComment,
-      reviewerId
-    );
-
-    return tx.photos.update({
-      where: {
-        photo_id: photoId,
-      },
-      data: getRejectedReviewData(reviewComment, reviewerId),
-    });
-  });
 }

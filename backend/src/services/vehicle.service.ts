@@ -45,7 +45,6 @@ interface CreateVehicleWithFirstPhotoData {
 
   branch_id?: number | null;
   new_branch_name?: string | null;
-
   new_branch_company_id?: number | null;
 
   new_company_name?: string | null;
@@ -71,11 +70,12 @@ interface CreateVehicleWithFirstPhotoData {
   city_id?: number | null;
   new_city_name?: string | null;
   new_city_county_id?: number | null;
-
   place?: string | null;
   taken_at?: string | null;
+
   file_path: string;
   cloudinary_public_id?: string | null;
+
   user_id: number;
 }
 
@@ -87,7 +87,6 @@ interface UpdateVehicleData {
 
   branch_id?: number | null;
   new_branch_name?: string | null;
-
   new_branch_company_id?: number | null;
 
   new_company_name?: string | null;
@@ -142,7 +141,6 @@ type PublicVehicleViewRow = {
 
   branch_city_id: number | null;
   branch_city_name: string | null;
-
   branch_county_id: number | null;
   branch_county_name: string | null;
 
@@ -401,24 +399,6 @@ function mapMyVehicleFromView(row: MyVehicleViewRow) {
   };
 }
 
-function getApprovedReviewData(reviewerId: number) {
-  return {
-    status: ReviewStatus.Kinnitatud,
-    reviewed_by: reviewerId,
-    reviewed_at: new Date(),
-    review_comment: null,
-  };
-}
-
-function getRejectedReviewData(reviewerId: number, reviewComment: string) {
-  return {
-    status: ReviewStatus.Tagasi_lukatud,
-    reviewed_by: reviewerId,
-    reviewed_at: new Date(),
-    review_comment: reviewComment,
-  };
-}
-
 function getPendingReviewData() {
   return {
     status: ReviewStatus.Ootel,
@@ -428,23 +408,62 @@ function getPendingReviewData() {
   };
 }
 
-async function createPendingCity(
+async function findOrCreatePendingCity(
   tx: Prisma.TransactionClient,
   data: {
-    name: string;
-    county_id: number;
+    city_id?: number | null;
+    name?: string | null;
+    county_id?: number | null;
     user_id: number;
   }
 ) {
-  return tx.cities.create({
+  if (data.city_id !== undefined && data.city_id !== null) {
+    return data.city_id;
+  }
+
+  if (!data.name || !data.county_id) {
+    return null;
+  }
+
+  const cityName = data.name.trim();
+
+  if (!cityName) {
+    throw new Error("city name is required");
+  }
+
+  const existingCity = await tx.cities.findFirst({
+    where: {
+      name: {
+        equals: cityName,
+        mode: "insensitive",
+      },
+    },
+  });
+
+  if (existingCity) {
+    if (existingCity.status !== ReviewStatus.Kinnitatud) {
+      await tx.cities.update({
+        where: {
+          city_id: existingCity.city_id,
+        },
+        data: getPendingReviewData(),
+      });
+    }
+
+    return existingCity.city_id;
+  }
+
+  const city = await tx.cities.create({
     data: {
-      name: data.name,
+      name: cityName,
       county_id: data.county_id,
       status: ReviewStatus.Ootel,
       created_by: data.user_id,
       review_comment: null,
     },
   });
+
+  return city.city_id;
 }
 
 async function resolveModelId(
@@ -460,10 +479,43 @@ async function resolveModelId(
     data.new_model_name &&
     data.new_model_category_id
   ) {
+    const manufacturer = data.new_model_manufacturer.trim();
+    const modelName = data.new_model_name.trim();
+
+    if (!manufacturer || !modelName) {
+      throw new Error("model manufacturer and name are required");
+    }
+
+    const existingModel = await tx.models.findFirst({
+      where: {
+        manufacturer: {
+          equals: manufacturer,
+          mode: "insensitive",
+        },
+        name: {
+          equals: modelName,
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (existingModel) {
+      if (existingModel.status !== ReviewStatus.Kinnitatud) {
+        await tx.models.update({
+          where: {
+            model_id: existingModel.model_id,
+          },
+          data: getPendingReviewData(),
+        });
+      }
+
+      return existingModel.model_id;
+    }
+
     const model = await tx.models.create({
       data: {
-        manufacturer: data.new_model_manufacturer,
-        name: data.new_model_name,
+        manufacturer,
+        name: modelName,
         category_id: data.new_model_category_id,
         status: ReviewStatus.Ootel,
         created_by: data.user_id,
@@ -475,6 +527,79 @@ async function resolveModelId(
   }
 
   throw new Error("model_id or new model data is required");
+}
+
+async function resolveCompanyId(
+  tx: Prisma.TransactionClient,
+  data: {
+    company_id?: number | null;
+
+    new_company_name?: string | null;
+    new_company_city_id?: number | null;
+    new_company_city_name?: string | null;
+    new_company_city_county_id?: number | null;
+
+    user_id: number;
+  }
+) {
+  if (data.company_id) {
+    return data.company_id;
+  }
+
+  if (!data.new_company_name) {
+    return null;
+  }
+
+  const companyName = data.new_company_name.trim();
+
+  if (!companyName) {
+    throw new Error("company name is required");
+  }
+
+  const existingCompany = await tx.companies.findFirst({
+    where: {
+      name: {
+        equals: companyName,
+        mode: "insensitive",
+      },
+    },
+  });
+
+  if (existingCompany) {
+    if (existingCompany.status !== ReviewStatus.Kinnitatud) {
+      await tx.companies.update({
+        where: {
+          company_id: existingCompany.company_id,
+        },
+        data: getPendingReviewData(),
+      });
+    }
+
+    return existingCompany.company_id;
+  }
+
+  const companyCityId = await findOrCreatePendingCity(tx, {
+    city_id: data.new_company_city_id,
+    name: data.new_company_city_name,
+    county_id: data.new_company_city_county_id,
+    user_id: data.user_id,
+  });
+
+  if (!companyCityId) {
+    throw new Error("company city is required");
+  }
+
+  const company = await tx.companies.create({
+    data: {
+      name: companyName,
+      city_id: companyCityId,
+      status: ReviewStatus.Ootel,
+      created_by: data.user_id,
+      review_comment: null,
+    },
+  });
+
+  return company.company_id;
 }
 
 async function resolveBranchId(
@@ -500,71 +625,61 @@ async function resolveBranchId(
     return null;
   }
 
-  let companyId = data.new_branch_company_id ?? null;
-
-  if (!companyId && data.new_company_name) {
-    let companyCityId = data.new_company_city_id ?? null;
-
-    if (
-      !companyCityId &&
-      data.new_company_city_name &&
-      data.new_company_city_county_id
-    ) {
-      const companyCity = await createPendingCity(tx, {
-        name: data.new_company_city_name,
-        county_id: data.new_company_city_county_id,
-        user_id: data.user_id,
-      });
-
-      companyCityId = companyCity.city_id;
-    }
-
-    if (!companyCityId) {
-      throw new Error("company city is required");
-    }
-
-    const company = await tx.companies.create({
-      data: {
-        name: data.new_company_name,
-        city_id: companyCityId,
-        status: ReviewStatus.Ootel,
-        created_by: data.user_id,
-        review_comment: null,
-      },
-    });
-
-    companyId = company.company_id;
-  }
+  const companyId = await resolveCompanyId(tx, {
+    company_id: data.new_branch_company_id,
+    new_company_name: data.new_company_name,
+    new_company_city_id: data.new_company_city_id,
+    new_company_city_name: data.new_company_city_name,
+    new_company_city_county_id: data.new_company_city_county_id,
+    user_id: data.user_id,
+  });
 
   if (!companyId) {
     throw new Error("company is required for new branch");
   }
 
-  let branchCityId = data.new_branch_city_id ?? null;
-
-  if (
-    !branchCityId &&
-    data.new_branch_city_name &&
-    data.new_branch_city_county_id
-  ) {
-    const branchCity = await createPendingCity(tx, {
-      name: data.new_branch_city_name,
-      county_id: data.new_branch_city_county_id,
-      user_id: data.user_id,
-    });
-
-    branchCityId = branchCity.city_id;
-  }
+  const branchCityId = await findOrCreatePendingCity(tx, {
+    city_id: data.new_branch_city_id,
+    name: data.new_branch_city_name,
+    county_id: data.new_branch_city_county_id,
+    user_id: data.user_id,
+  });
 
   if (!branchCityId) {
     throw new Error("branch city is required");
+  }
+
+  const branchName = data.new_branch_name?.trim() || "Peafiliaal";
+
+  const existingBranch = await tx.company_branches.findFirst({
+    where: {
+      company_id: companyId,
+      city_id: branchCityId,
+      branch_name: {
+        equals: branchName,
+        mode: "insensitive",
+      },
+    },
+  });
+
+  if (existingBranch) {
+    if (existingBranch.status !== ReviewStatus.Kinnitatud) {
+      await tx.company_branches.update({
+        where: {
+          branch_id: existingBranch.branch_id,
+        },
+        data: getPendingReviewData(),
+      });
+    }
+
+    return existingBranch.branch_id;
   }
 
   const branch = await tx.company_branches.create({
     data: {
       company_id: companyId,
       city_id: branchCityId,
-      branch_name: data.new_branch_name?.trim() || "Peafiliaal",
+      branch_name: branchName,
       status: ReviewStatus.Ootel,
       created_by: data.user_id,
       review_comment: null,
@@ -578,95 +693,12 @@ async function resolveFirstPhotoCityId(
   tx: Prisma.TransactionClient,
   data: CreateVehicleWithFirstPhotoData
 ) {
-  if (data.city_id) {
-    return data.city_id;
-  }
-
-  if (data.new_city_name && data.new_city_county_id) {
-    const city = await createPendingCity(tx, {
-      name: data.new_city_name,
-      county_id: data.new_city_county_id,
-      user_id: data.user_id,
-    });
-
-    return city.city_id;
-  }
-
-  return null;
-}
-
-async function setVehicleReferencesStatus(
-  tx: Prisma.TransactionClient,
-  vehicleId: number,
-  status: ReviewStatus,
-  reviewerId: number,
-  reviewComment?: string
-) {
-  const vehicle = await tx.vehicles.findUnique({
-    where: {
-      vehicle_id: vehicleId,
-    },
-    include: {
-      model: true,
-      branch: {
-        include: {
-          company: true,
-          city: true,
-        },
-      },
-    },
+  return findOrCreatePendingCity(tx, {
+    city_id: data.city_id,
+    name: data.new_city_name,
+    county_id: data.new_city_county_id,
+    user_id: data.user_id,
   });
-
-  if (!vehicle) {
-    return;
-  }
-
-  const reviewData =
-    status === ReviewStatus.Kinnitatud
-      ? getApprovedReviewData(reviewerId)
-      : getRejectedReviewData(reviewerId, reviewComment ?? "");
-
-  if (vehicle.model.status !== ReviewStatus.Kinnitatud) {
-    await tx.models.update({
-      where: {
-        model_id: vehicle.model_id,
-      },
-      data: reviewData,
-    });
-  }
-
-  if (vehicle.branch && vehicle.branch.status !== ReviewStatus.Kinnitatud) {
-    await tx.company_branches.update({
-      where: {
-        branch_id: vehicle.branch.branch_id,
-      },
-      data: reviewData,
-    });
-  }
-
-  if (
-    vehicle.branch?.company &&
-    vehicle.branch.company.status !== ReviewStatus.Kinnitatud
-  ) {
-    await tx.companies.update({
-      where: {
-        company_id: vehicle.branch.company.company_id,
-      },
-      data: reviewData,
-    });
-  }
-
-  if (
-    vehicle.branch?.city &&
-    vehicle.branch.city.status !== ReviewStatus.Kinnitatud
-  ) {
-    await tx.cities.update({
-      where: {
-        city_id: vehicle.branch.city.city_id,
-      },
-      data: reviewData,
-    });
-  }
 }
 
 async function resetVehicleReferencesToPending(
@@ -755,10 +787,6 @@ async function resetFirstVehiclePhotoToPending(
     return;
   }
 
-  if (firstPhoto.status === ReviewStatus.Kinnitatud) {
-    return;
-  }
-
   if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
     await tx.cities.update({
       where: {
@@ -774,56 +802,6 @@ async function resetFirstVehiclePhotoToPending(
     },
     data: getPendingReviewData(),
   });
-}
-
-async function setFirstVehiclePhotoStatus(
-  tx: Prisma.TransactionClient,
-  vehicleId: number,
-  status: ReviewStatus,
-  reviewerId: number,
-  reviewComment?: string
-) {
-  const firstPhoto = await tx.photos.findFirst({
-    where: {
-      vehicle_id: vehicleId,
-    },
-    orderBy: {
-      created_at: "asc",
-    },
-    include: {
-      city: true,
-    },
-  });
-
-  if (!firstPhoto) {
-    return;
-  }
-
-  const reviewData =
-    status === ReviewStatus.Kinnitatud
-      ? getApprovedReviewData(reviewerId)
-      : getRejectedReviewData(reviewerId, reviewComment ?? "");
-
-  if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
-    await tx.cities.update({
-      where: {
-        city_id: firstPhoto.city.city_id,
-      },
-      data: reviewData,
-    });
-  }
-
-  if (
-    status === ReviewStatus.Kinnitatud ||
-    firstPhoto.status !== ReviewStatus.Kinnitatud
-  ) {
-    await tx.photos.update({
-      where: {
-        photo_id: firstPhoto.photo_id,
-      },
-      data: reviewData,
-    });
-  }
 }
 
 export async function getPublicVehicles(params: GetPublicVehiclesParams) {
@@ -887,9 +865,7 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
     }
 
     if (countyId) {
-      branchLocationFilters.push(
-        Prisma.sql`v.branch_county_id = ${countyId}`
-      );
+      branchLocationFilters.push(Prisma.sql`v.branch_county_id = ${countyId}`);
       photoLocationFilters.push(Prisma.sql`p.county_id = ${countyId}`);
     }
 
@@ -911,22 +887,20 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
       ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
       : Prisma.empty;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<PublicVehicleViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
-      ${whereSql}
-      ORDER BY v.created_at DESC, v.vehicle_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<PublicVehicleViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+    ${whereSql}
+    ORDER BY v.created_at DESC, v.vehicle_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -1023,22 +997,20 @@ export async function getMyVehicles(params: GetMyVehiclesParams) {
 
   const whereSql = Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<MyVehicleViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
-      ${whereSql}
-      ORDER BY v.created_at DESC, v.vehicle_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<MyVehicleViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
+    ${whereSql}
+    ORDER BY v.created_at DESC, v.vehicle_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_my_vehicles"))} v
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -1116,6 +1088,24 @@ export async function createVehicleWithFirstPhoto(
   data: CreateVehicleWithFirstPhotoData
 ) {
   return prisma.$transaction(async (tx) => {
+    const regNumber = data.reg_number.trim();
+
+    const existingVehicle = await tx.vehicles.findFirst({
+      where: {
+        reg_number: {
+          equals: regNumber,
+          mode: "insensitive",
+        },
+      },
+      select: {
+        vehicle_id: true,
+      },
+    });
+
+    if (existingVehicle) {
+      throw new Error("Vehicle with this registration number already exists");
+    }
+
     const modelId = await resolveModelId(tx, data);
     const branchId = await resolveBranchId(tx, data);
     const photoCityId = await resolveFirstPhotoCityId(tx, data);
@@ -1124,7 +1114,7 @@ export async function createVehicleWithFirstPhoto(
       data: {
         model_id: modelId,
         branch_id: branchId,
-        reg_number: data.reg_number,
+        reg_number: regNumber,
         vla_year: data.vla_year ?? null,
         vin_code: data.vin_code ?? null,
         chassis: data.chassis ?? null,
@@ -1180,9 +1170,36 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleData) 
       throw new Error("Kinnitatud sõidukit ei saa muuta.");
     }
 
+    const nextRegNumber = data.reg_number?.trim();
+
+    if (nextRegNumber) {
+      const existingVehicle = await tx.vehicles.findFirst({
+        where: {
+          reg_number: {
+            equals: nextRegNumber,
+            mode: "insensitive",
+          },
+          NOT: {
+            vehicle_id: vehicleId,
+          },
+        },
+        select: {
+          vehicle_id: true,
+        },
+      });
+
+      if (existingVehicle) {
+        throw new Error("Vehicle with this registration number already exists");
+      }
+    }
+
     let nextModelId: number | undefined;
 
-    if (data.new_model_manufacturer && data.new_model_name && data.new_model_category_id) {
+    if (
+      data.new_model_manufacturer &&
+      data.new_model_name &&
+      data.new_model_category_id
+    ) {
       nextModelId = await resolveModelId(tx, {
         model_id: null,
         new_model_manufacturer: data.new_model_manufacturer,
@@ -1238,7 +1255,7 @@ export async function updateVehicle(vehicleId: number, data: UpdateVehicleData) 
         ...(nextModelId !== undefined ? { model_id: nextModelId } : {}),
         ...(nextBranchId !== undefined ? { branch_id: nextBranchId } : {}),
         ...(data.reg_number !== undefined
-          ? { reg_number: data.reg_number }
+          ? { reg_number: data.reg_number.trim() }
           : {}),
         ...(data.vla_year !== undefined ? { vla_year: data.vla_year } : {}),
         ...(data.vin_code !== undefined ? { vin_code: data.vin_code } : {}),
@@ -1325,18 +1342,17 @@ export async function getPendingVehicles(params: {
     status: ReviewStatus.Ootel,
   };
 
-  const [items, total] = await Promise.all([
-    prisma.vehicles.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: {
-        created_at: "asc",
-      },
-      include: vehicleDashboardInclude,
-    }),
-    prisma.vehicles.count({ where }),
-  ]);
+  const items = await prisma.vehicles.findMany({
+    where,
+    skip,
+    take: limit,
+    orderBy: {
+      created_at: "asc",
+    },
+    include: vehicleDashboardInclude,
+  });
+
+  const total = await prisma.vehicles.count({ where });
 
   return {
     items,
@@ -1347,64 +1363,4 @@ export async function getPendingVehicles(params: {
       totalPages: Math.ceil(total / limit),
     },
   };
-}
-
-export async function approveVehicle(vehicleId: number, reviewerId: number) {
-  return prisma.$transaction(async (tx) => {
-    await setVehicleReferencesStatus(
-      tx,
-      vehicleId,
-      ReviewStatus.Kinnitatud,
-      reviewerId
-    );
-
-    const vehicle = await tx.vehicles.update({
-      where: {
-        vehicle_id: vehicleId,
-      },
-      data: getApprovedReviewData(reviewerId),
-    });
-
-    await setFirstVehiclePhotoStatus(
-      tx,
-      vehicleId,
-      ReviewStatus.Kinnitatud,
-      reviewerId
-    );
-
-    return vehicle;
-  });
-}
-
-export async function rejectVehicle(
-  vehicleId: number,
-  reviewerId: number,
-  reviewComment: string
-) {
-  return prisma.$transaction(async (tx) => {
-    await setVehicleReferencesStatus(
-      tx,
-      vehicleId,
-      ReviewStatus.Tagasi_lukatud,
-      reviewerId,
-      reviewComment
-    );
-
-    const vehicle = await tx.vehicles.update({
-      where: {
-        vehicle_id: vehicleId,
-      },
-      data: getRejectedReviewData(reviewerId, reviewComment),
-    });
-
-    await setFirstVehiclePhotoStatus(
-      tx,
-      vehicleId,
-      ReviewStatus.Tagasi_lukatud,
-      reviewerId,
-      reviewComment
-    );
-
-    return vehicle;
-  });
 }

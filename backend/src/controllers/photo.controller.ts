@@ -5,7 +5,6 @@ import type { UpdatePhotoBody } from "../types/photo.js";
 import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
 
 import {
-  approvePhoto,
   createPhoto,
   deletePhoto,
   getMyPhotoById,
@@ -15,7 +14,6 @@ import {
   getPhotoForEdit,
   getPhotosByVehicleId,
   getPublicPhotos,
-  rejectPhoto,
   updatePhoto,
 } from "../services/photo.service.js";
 
@@ -26,7 +24,6 @@ import {
   createPhotoSchema,
   updatePhotoSchema,
 } from "../validators/photo.validator.js";
-import { rejectSchema } from "../validators/moderation.validator.js";
 
 type NewCityInput = {
   name: string;
@@ -620,7 +617,7 @@ export async function updatePhotoHandler(
     }
 
     const uploadedImage = req.file
-      ? await uploadBufferToCloudinary(req.file.buffer)
+      ? await uploadBufferToCloudinary(req.file.buffer, "transitview")
       : null;
 
     const updatedPhoto = await updatePhoto(photoId, {
@@ -744,88 +741,6 @@ export async function getPendingPhotosHandler(
     res.status(200).json(result);
   } catch (error) {
     console.error("Get pending photos error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
-export async function approvePhotoHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-  try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
-    const photoId = parsePositiveInt(req.params.id);
-
-    if (!photoId) {
-      res.status(400).json({ message: "Invalid photo id" });
-      return;
-    }
-
-    const photo = await approvePhoto(photoId, req.user.userId);
-
-    res.status(200).json({
-      message: "Photo approved successfully",
-      photo,
-    });
-  } catch (error) {
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Photo not found" });
-      return;
-    }
-
-    console.error("Approve photo error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
-export async function rejectPhotoHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-  try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
-    const photoId = parsePositiveInt(req.params.id);
-
-    if (!photoId) {
-      res.status(400).json({ message: "Invalid photo id" });
-      return;
-    }
-
-    const parsed = rejectSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-      return;
-    }
-
-    const photo = await rejectPhoto(
-      photoId,
-      parsed.data.review_comment,
-      req.user.userId
-    );
-
-    res.status(200).json({
-      message: "Photo rejected successfully",
-      photo,
-    });
-  } catch (error) {
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Photo not found" });
-      return;
-    }
-
-    console.error("Reject photo error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }

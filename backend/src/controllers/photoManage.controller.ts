@@ -1,24 +1,17 @@
 import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";
-import type { ManagePhotoListQuery } from "../types/photoManage.js";
-import {
-  ReviewStatus,
-  VehicleCondition,
-} from "../generated/prisma/client.js";
+import { ReviewStatus, VehicleCondition } from "../generated/prisma/client.js";
+
 import {
   approveManagePhoto,
-  deleteManagePhoto,
   getManagePhotoById,
   getManagePhotos,
   pendingManagePhoto,
   rejectManagePhoto,
-  updateManagePhoto,
 } from "../services/photoManage.service.js";
-import {
-  rejectSchema,
-  updateManagePhotoSchema,
-} from "../validators/moderation.validator.js";
+
+import { rejectSchema } from "../validators/moderation.validator.js";
 
 function getSingleString(value: unknown): string | undefined {
   if (typeof value === "string") {
@@ -101,6 +94,16 @@ function parseOptionalPositiveInt(value: unknown) {
   return parsed;
 }
 
+function getActorId(req: AuthRequest) {
+  const actorId = Number(req.user?.userId);
+
+  if (!Number.isInteger(actorId) || actorId <= 0) {
+    return undefined;
+  }
+
+  return actorId;
+}
+
 function isPrismaNotFoundError(error: unknown) {
   return (
     typeof error === "object" &&
@@ -110,24 +113,8 @@ function isPrismaNotFoundError(error: unknown) {
   );
 }
 
-function isPrismaForeignKeyError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2003"
-  );
-}
-
 function isRejectCommentError(error: unknown) {
   return error instanceof Error && error.message === "Reject comment is required";
-}
-
-function isProtectedPhotoError(error: unknown) {
-  return (
-    error instanceof Error &&
-    error.message.includes("Kinnitatud fotot ei saa kustutada")
-  );
 }
 
 export async function getManagePhotosHandler(
@@ -135,16 +122,13 @@ export async function getManagePhotosHandler(
   res: Response
 ): Promise<void> {
   try {
-    const query = req.query as ManagePhotoListQuery;
-
-    const page = Math.max(Number(getSingleString(query.page)) || 1, 1);
-
+    const page = Math.max(Number(getSingleString(req.query.page)) || 1, 1);
     const limit = Math.min(
-      Math.max(Number(getSingleString(query.limit)) || 10, 1),
+      Math.max(Number(getSingleString(req.query.limit)) || 10, 1),
       50
     );
 
-    const status = parseReviewStatus(query.status);
+    const status = parseReviewStatus(req.query.status);
 
     if (status === null) {
       res.status(400).json({
@@ -154,7 +138,7 @@ export async function getManagePhotosHandler(
       return;
     }
 
-    const condition = parseVehicleCondition(query.condition);
+    const condition = parseVehicleCondition(req.query.condition);
 
     if (condition === null) {
       res.status(400).json({
@@ -164,12 +148,21 @@ export async function getManagePhotosHandler(
       return;
     }
 
-    const cityId = parseOptionalPositiveInt(query.cityId);
-    const countyId = parseOptionalPositiveInt(query.countyId);
-    const vehicleId = parseOptionalPositiveInt(query.vehicleId);
-    const authorId = parseOptionalPositiveInt(query.authorId);
-    const vehicleCreatorId = parseOptionalPositiveInt(query.vehicleCreatorId);
-    const categoryId = parseOptionalPositiveInt(query.categoryId);
+    const cityId = parseOptionalPositiveInt(req.query.cityId);
+    const countyId = parseOptionalPositiveInt(req.query.countyId);
+    const vehicleId = parseOptionalPositiveInt(req.query.vehicleId);
+
+    const authorId =
+      parseOptionalPositiveInt(req.query.authorId) ??
+      parseOptionalPositiveInt(req.query.creatorId) ??
+      parseOptionalPositiveInt(req.query.createdBy) ??
+      parseOptionalPositiveInt(req.query.userId);
+
+    const vehicleCreatorId = parseOptionalPositiveInt(
+      req.query.vehicleCreatorId
+    );
+
+    const categoryId = parseOptionalPositiveInt(req.query.categoryId);
 
     if (
       cityId === null ||
@@ -183,8 +176,8 @@ export async function getManagePhotosHandler(
       return;
     }
 
-    const createdFrom = parseDateQuery(query.createdFrom);
-    const createdTo = parseDateQuery(query.createdTo, true);
+    const createdFrom = parseDateQuery(req.query.createdFrom);
+    const createdTo = parseDateQuery(req.query.createdTo, true);
 
     if (createdFrom === null) {
       res.status(400).json({ message: "Invalid createdFrom date format" });
@@ -207,7 +200,7 @@ export async function getManagePhotosHandler(
       page,
       limit,
       status,
-      regNumber: getSingleString(query.regNumber)?.trim() || undefined,
+      regNumber: getSingleString(req.query.regNumber)?.trim() || undefined,
       cityId,
       countyId,
       vehicleId,
@@ -252,99 +245,6 @@ export async function getManagePhotoHandler(
   }
 }
 
-export async function updateManagePhotoHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-  try {
-    const photoId = Number(req.params.id);
-
-    if (!Number.isInteger(photoId) || photoId <= 0) {
-      res.status(400).json({ message: "Invalid photo id" });
-      return;
-    }
-
-    const parsed = updateManagePhotoSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-      return;
-    }
-
-    const photo = await updateManagePhoto(photoId, parsed.data);
-
-    if (!photo) {
-      res.status(404).json({ message: "Photo not found" });
-      return;
-    }
-
-    res.status(200).json({
-      message: "Photo updated successfully",
-      photo,
-    });
-  } catch (error) {
-    if (isRejectCommentError(error)) {
-      res.status(400).json({
-        message: "review_comment is required when rejecting photo",
-      });
-      return;
-    }
-
-    if (isPrismaNotFoundError(error)) {
-      res.status(404).json({ message: "Photo not found" });
-      return;
-    }
-
-    if (isPrismaForeignKeyError(error)) {
-      res.status(400).json({
-        message: "Invalid related record id",
-      });
-      return;
-    }
-
-    console.error("Update manage photo error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
-export async function deleteManagePhotoHandler(
-  req: AuthRequest,
-  res: Response
-): Promise<void> {
-  try {
-    const photoId = Number(req.params.id);
-
-    if (!Number.isInteger(photoId) || photoId <= 0) {
-      res.status(400).json({ message: "Invalid photo id" });
-      return;
-    }
-
-    const deletedPhoto = await deleteManagePhoto(photoId);
-
-    if (!deletedPhoto) {
-      res.status(404).json({ message: "Photo not found" });
-      return;
-    }
-
-    res.status(200).json({
-      message: "Photo deleted successfully",
-    });
-  } catch (error) {
-    if (isProtectedPhotoError(error)) {
-      res.status(403).json({
-        message: error instanceof Error ? error.message : "Forbidden",
-      });
-      return;
-    }
-
-    console.error("Delete manage photo error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-
 export async function approveManagePhotoHandler(
   req: AuthRequest,
   res: Response
@@ -357,7 +257,7 @@ export async function approveManagePhotoHandler(
       return;
     }
 
-    const photo = await approveManagePhoto(photoId, req.user?.userId);
+    const photo = await approveManagePhoto(photoId, getActorId(req));
 
     res.status(200).json({
       message: "Photo approved successfully",
@@ -399,7 +299,7 @@ export async function rejectManagePhotoHandler(
     const photo = await rejectManagePhoto(
       photoId,
       parsed.data.review_comment,
-      req.user?.userId
+      getActorId(req)
     );
 
     res.status(200).json({
@@ -429,11 +329,6 @@ export async function pendingManagePhotoHandler(
   res: Response
 ): Promise<void> {
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Authentication required" });
-      return;
-    }
-
     const photoId = Number(req.params.id);
 
     if (!Number.isInteger(photoId) || photoId <= 0) {

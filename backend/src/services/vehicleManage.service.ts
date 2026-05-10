@@ -5,58 +5,23 @@ import {
   type VehicleCondition,
 } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
-import { deleteVehicle, updateVehicle } from "./vehicle.service.js";
 
 interface GetManageVehiclesParams {
   page: number;
   limit: number;
-
   status?: ReviewStatus;
   regNumber?: string;
-
   createdBy?: number;
   creatorId?: number;
-
   cityId?: number;
   countyId?: number;
   categoryId?: number;
   modelId?: number;
   companyId?: number;
   branchId?: number;
-
   condition?: VehicleCondition;
-
   createdFrom?: Date;
   createdTo?: Date;
-}
-
-interface UpdateManageVehicleData {
-  model_id?: number | null;
-  new_model_manufacturer?: string | null;
-  new_model_name?: string | null;
-  new_model_category_id?: number | null;
-
-  branch_id?: number | null;
-  new_branch_name?: string | null;
-
-  new_branch_company_id?: number | null;
-
-  new_company_name?: string | null;
-  new_company_city_id?: number | null;
-  new_company_city_name?: string | null;
-  new_company_city_county_id?: number | null;
-
-  new_branch_city_id?: number | null;
-  new_branch_city_name?: string | null;
-  new_branch_city_county_id?: number | null;
-
-  reg_number?: string;
-  vla_year?: number | null;
-  vin_code?: string | null;
-  chassis?: string | null;
-  condition?: VehicleCondition;
-
-  actor_id: number;
 }
 
 type CountRow = {
@@ -258,7 +223,6 @@ function mapManageVehicleFromView(row: ManageVehicleViewRow) {
       : null,
 
     photos: coverPhoto ? [coverPhoto] : [],
-
     photos_count: row.photos_total,
     total_photos_count: row.photos_total,
     pending_photos_count: row.photos_pending,
@@ -293,29 +257,12 @@ function getVehicleReviewData(params: {
   };
 }
 
-function getPhotoReviewData(params: {
-  status: ReviewStatus;
-  reviewerId: number;
-  reviewComment?: string;
-}) {
-  if (params.status === ReviewStatus.Kinnitatud) {
-    return {
-      status: ReviewStatus.Kinnitatud,
-      reviewed_by: params.reviewerId,
-      reviewed_at: new Date(),
-      review_comment: null,
-    };
-  }
-
-  if (!params.reviewComment || !params.reviewComment.trim()) {
-    throw new Error("Reject comment is required");
-  }
-
+function getPendingReviewData() {
   return {
-    status: ReviewStatus.Tagasi_lukatud,
-    reviewed_by: params.reviewerId,
-    reviewed_at: new Date(),
-    review_comment: params.reviewComment.trim(),
+    status: ReviewStatus.Ootel,
+    reviewed_by: null,
+    reviewed_at: null,
+    review_comment: null,
   };
 }
 
@@ -449,6 +396,43 @@ async function setFirstVehiclePhotoStatus(
   });
 }
 
+async function setFirstVehiclePhotoPending(
+  tx: Prisma.TransactionClient,
+  vehicleId: number
+) {
+  const firstPhoto = await tx.photos.findFirst({
+    where: {
+      vehicle_id: vehicleId,
+    },
+    orderBy: {
+      created_at: "asc",
+    },
+    include: {
+      city: true,
+    },
+  });
+
+  if (!firstPhoto) {
+    return;
+  }
+
+  if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
+    await tx.cities.update({
+      where: {
+        city_id: firstPhoto.city.city_id,
+      },
+      data: getPendingReviewData(),
+    });
+  }
+
+  await tx.photos.update({
+    where: {
+      photo_id: firstPhoto.photo_id,
+    },
+    data: getPendingReviewData(),
+  });
+}
+
 export async function getManageVehicles(params: GetManageVehiclesParams) {
   const {
     page,
@@ -469,6 +453,7 @@ export async function getManageVehicles(params: GetManageVehiclesParams) {
 
   const skip = (page - 1) * limit;
   const filters: Prisma.Sql[] = [];
+
   const authorId = createdBy ?? creatorId;
 
   if (status) {
@@ -533,46 +518,42 @@ export async function getManageVehicles(params: GetManageVehiclesParams) {
       ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
       : Prisma.empty;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<ManageVehicleViewRow[]>`
-      SELECT
-        v.*,
+  const items = await prisma.$queryRaw<ManageVehicleViewRow[]>`
+    SELECT
+      v.*,
 
-        cover_photo.photo_id AS cover_photo_id,
-        cover_photo.city_id AS cover_photo_city_id,
-        cover_photo.place AS cover_photo_place,
-        cover_photo.taken_at AS cover_photo_taken_at,
-        cover_photo.file_path AS cover_photo_file_path,
-        cover_photo.cloudinary_public_id AS cover_photo_cloudinary_public_id,
-        cover_photo.status AS cover_photo_status,
-        cover_photo.review_comment AS cover_photo_review_comment,
-        cover_photo.created_at AS cover_photo_created_at,
-        cover_photo.city_name AS cover_photo_city_name,
-        cover_photo.county_id AS cover_photo_county_id,
-        cover_photo.county_name AS cover_photo_county_name
+      cover_photo.photo_id AS cover_photo_id,
+      cover_photo.city_id AS cover_photo_city_id,
+      cover_photo.place AS cover_photo_place,
+      cover_photo.taken_at AS cover_photo_taken_at,
+      cover_photo.file_path AS cover_photo_file_path,
+      cover_photo.cloudinary_public_id AS cover_photo_cloudinary_public_id,
+      cover_photo.status AS cover_photo_status,
+      cover_photo.review_comment AS cover_photo_review_comment,
+      cover_photo.created_at AS cover_photo_created_at,
+      cover_photo.city_name AS cover_photo_city_name,
+      cover_photo.county_id AS cover_photo_county_id,
+      cover_photo.county_name AS cover_photo_county_name
 
-      FROM ${Prisma.raw(dbView("v_manage_vehicles"))} v
+    FROM ${Prisma.raw(dbView("v_manage_vehicles"))} v
+    LEFT JOIN LATERAL (
+      SELECT p.*
+      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+      WHERE p.vehicle_id = v.vehicle_id
+      ORDER BY p.created_at ASC, p.photo_id ASC
+      LIMIT 1
+    ) cover_photo ON TRUE
+    ${whereSql}
+    ORDER BY v.created_at DESC, v.vehicle_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-      LEFT JOIN LATERAL (
-        SELECT p.*
-        FROM ${Prisma.raw(dbView("v_manage_photos"))} p
-        WHERE p.vehicle_id = v.vehicle_id
-        ORDER BY p.created_at ASC, p.photo_id ASC
-        LIMIT 1
-      ) cover_photo ON TRUE
-
-      ${whereSql}
-      ORDER BY v.created_at DESC, v.vehicle_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
-
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_manage_vehicles"))} v
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_manage_vehicles"))} v
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -594,44 +575,6 @@ export async function getManageVehicleById(vehicleId: number) {
     },
     include: manageVehicleDetailInclude,
   });
-}
-
-export async function updateManageVehicle(
-  vehicleId: number,
-  data: UpdateManageVehicleData
-) {
-  return updateVehicle(vehicleId, {
-    model_id: data.model_id,
-    new_model_manufacturer: data.new_model_manufacturer,
-    new_model_name: data.new_model_name,
-    new_model_category_id: data.new_model_category_id,
-
-    branch_id: data.branch_id,
-    new_branch_name: data.new_branch_name,
-
-    new_branch_company_id: data.new_branch_company_id,
-
-    new_company_name: data.new_company_name,
-    new_company_city_id: data.new_company_city_id,
-    new_company_city_name: data.new_company_city_name,
-    new_company_city_county_id: data.new_company_city_county_id,
-
-    new_branch_city_id: data.new_branch_city_id,
-    new_branch_city_name: data.new_branch_city_name,
-    new_branch_city_county_id: data.new_branch_city_county_id,
-
-    reg_number: data.reg_number,
-    vla_year: data.vla_year,
-    vin_code: data.vin_code,
-    chassis: data.chassis,
-    condition: data.condition,
-
-    user_id: data.actor_id,
-  });
-}
-
-export async function deleteManageVehicle(vehicleId: number) {
-  return deleteVehicle(vehicleId);
 }
 
 export async function approveManageVehicle(
@@ -706,42 +649,20 @@ export async function rejectManageVehicle(
 
 export async function pendingManageVehicle(vehicleId: number) {
   return prisma.$transaction(async (tx) => {
-    const vehicle = await tx.vehicles.update({
+    await tx.vehicles.update({
       where: {
         vehicle_id: vehicleId,
       },
-      data: {
-        status: ReviewStatus.Ootel,
-        reviewed_by: null,
-        reviewed_at: null,
-        review_comment: null,
+      data: getPendingReviewData(),
+    });
+
+    await setFirstVehiclePhotoPending(tx, vehicleId);
+
+    return tx.vehicles.findUnique({
+      where: {
+        vehicle_id: vehicleId,
       },
       include: manageVehicleDetailInclude,
     });
-
-    const firstPhoto = await tx.photos.findFirst({
-      where: {
-        vehicle_id: vehicleId,
-      },
-      orderBy: {
-        created_at: "asc",
-      },
-    });
-
-    if (firstPhoto) {
-      await tx.photos.update({
-        where: {
-          photo_id: firstPhoto.photo_id,
-        },
-        data: {
-          status: ReviewStatus.Ootel,
-          reviewed_by: null,
-          reviewed_at: null,
-          review_comment: null,
-        },
-      });
-    }
-
-    return vehicle;
   });
 }

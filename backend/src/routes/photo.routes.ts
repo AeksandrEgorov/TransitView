@@ -10,8 +10,6 @@ import {
   updatePhotoHandler,
   deletePhotoHandler,
   getPendingPhotosHandler,
-  approvePhotoHandler,
-  rejectPhotoHandler,
 } from "../controllers/photo.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
@@ -29,7 +27,6 @@ router.post(
 router.get("/", getPhotosHandler);
 
 router.get("/my", requireAuth, getMyPhotosHandler);
-
 router.get("/my/:id", requireAuth, getMyPhotoHandler);
 
 router.get(
@@ -53,19 +50,5 @@ router.patch(
 );
 
 router.delete("/:id", requireAuth, deletePhotoHandler);
-
-router.patch(
-  "/:id/approve",
-  requireAuth,
-  requireRole("Andmebaasi_toimetaja", "Administraator"),
-  approvePhotoHandler
-);
-
-router.patch(
-  "/:id/reject",
-  requireAuth,
-  requireRole("Andmebaasi_toimetaja", "Administraator"),
-  rejectPhotoHandler
-);
 
 export default router;

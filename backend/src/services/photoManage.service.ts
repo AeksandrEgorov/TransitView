@@ -6,44 +6,32 @@ import {
   type VehicleCondition,
 } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
-import { deleteCloudinaryImage } from "../utils/uploadToCloudinary.js";
-import { cleanupUnusedPhotoReferences } from "./referenceCleanup.service.js";
 
 interface GetManagePhotosParams {
   page: number;
   limit: number;
-
   status?: ReviewStatus;
   regNumber?: string;
-
   cityId?: number;
   countyId?: number;
   vehicleId?: number;
-
   authorId?: number;
   vehicleCreatorId?: number;
-
   categoryId?: number;
   condition?: VehicleCondition;
-
   createdFrom?: Date;
   createdTo?: Date;
 }
 
-interface UpdateManagePhotoData {
-  vehicle_id?: number;
-  author_id?: number;
-  city_id?: number | null;
-  place?: string | null;
-  taken_at?: string | null;
-  file_path?: string;
-  cloudinary_public_id?: string | null;
-  status?: ReviewStatus;
-  review_comment?: string | null;
-}
-
 type CountRow = {
   total: bigint | number;
+};
+
+type ReviewData = {
+  status: ReviewStatus;
+  reviewed_by?: number | null;
+  reviewed_at: Date | null;
+  review_comment: string | null;
 };
 
 type ManagePhotoViewRow = {
@@ -84,6 +72,7 @@ type ManagePhotoViewRow = {
 
   branch_city_id: number | null;
   branch_city_name: string | null;
+
   branch_county_id: number | null;
   branch_county_name: string | null;
 
@@ -223,45 +212,64 @@ function mapManagePhotoFromView(row: ManagePhotoViewRow) {
   };
 }
 
-function buildPhotoModerationData(params: {
-  status?: ReviewStatus;
-  reviewComment?: string | null;
-}): Prisma.PhotosUncheckedUpdateInput {
-  const { status, reviewComment } = params;
+function getPhotoApproveData(reviewerId?: number): ReviewData {
+  return {
+    status: ReviewStatus.Kinnitatud,
+    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
+    reviewed_at: new Date(),
+    review_comment: null,
+  };
+}
 
-  if (!status) {
-    return reviewComment !== undefined
-      ? {
-          review_comment: reviewComment,
-        }
-      : {};
-  }
-
-  if (status === ReviewStatus.Ootel) {
-    return {
-      status,
-      reviewed_at: null,
-      review_comment: null,
-    };
-  }
-
-  if (status === ReviewStatus.Kinnitatud) {
-    return {
-      status,
-      reviewed_at: new Date(),
-      review_comment: null,
-    };
-  }
-
+function getPhotoRejectData(
+  reviewComment: string,
+  reviewerId?: number
+): ReviewData {
   if (!reviewComment || !reviewComment.trim()) {
     throw new Error("Reject comment is required");
   }
 
   return {
-    status,
+    status: ReviewStatus.Tagasi_lukatud,
+    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
     reviewed_at: new Date(),
     review_comment: reviewComment.trim(),
   };
+}
+
+function getPendingReviewData(): ReviewData {
+  return {
+    status: ReviewStatus.Ootel,
+    reviewed_by: null,
+    reviewed_at: null,
+    review_comment: null,
+  };
+}
+
+async function setPhotoCityStatus(
+  tx: Prisma.TransactionClient,
+  photoId: number,
+  data: ReviewData
+) {
+  const photo = await tx.photos.findUnique({
+    where: {
+      photo_id: photoId,
+    },
+    include: {
+      city: true,
+    },
+  });
+
+  if (!photo?.city || photo.city.status === ReviewStatus.Kinnitatud) {
+    return;
+  }
+
+  await tx.cities.update({
+    where: {
+      city_id: photo.city.city_id,
+    },
+    data,
+  });
 }
 
 export async function getManagePhotos(params: GetManagePhotosParams) {
@@ -333,22 +341,20 @@ export async function getManagePhotos(params: GetManagePhotosParams) {
       ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
       : Prisma.empty;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<ManagePhotoViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
-      ${whereSql}
-      ORDER BY p.created_at DESC, p.photo_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<ManagePhotoViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+    ${whereSql}
+    ORDER BY p.created_at DESC, p.photo_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
@@ -369,151 +375,6 @@ export async function getManagePhotoById(photoId: number) {
       photo_id: photoId,
     },
     include: managePhotoDetailInclude,
-  });
-}
-
-export async function updateManagePhoto(
-  photoId: number,
-  data: UpdateManagePhotoData
-) {
-  const oldPhoto = await prisma.photos.findUnique({
-    where: {
-      photo_id: photoId,
-    },
-  });
-
-  if (!oldPhoto) {
-    return null;
-  }
-
-  const moderationData = buildPhotoModerationData({
-    status: data.status,
-    reviewComment: data.review_comment,
-  });
-
-  const updateData: Prisma.PhotosUncheckedUpdateInput = {
-    ...(data.vehicle_id !== undefined ? { vehicle_id: data.vehicle_id } : {}),
-    ...(data.author_id !== undefined ? { author_id: data.author_id } : {}),
-    ...(data.city_id !== undefined ? { city_id: data.city_id } : {}),
-    ...(data.place !== undefined ? { place: data.place } : {}),
-    ...(data.taken_at !== undefined
-      ? { taken_at: data.taken_at ? new Date(data.taken_at) : null }
-      : {}),
-    ...(data.file_path !== undefined ? { file_path: data.file_path } : {}),
-    ...(data.cloudinary_public_id !== undefined
-      ? { cloudinary_public_id: data.cloudinary_public_id }
-      : {}),
-    ...moderationData,
-  };
-
-  const updatedPhoto = await prisma.photos.update({
-    where: {
-      photo_id: photoId,
-    },
-    data: updateData,
-    include: managePhotoDetailInclude,
-  });
-
-  const imageWasReplaced =
-    data.cloudinary_public_id &&
-    oldPhoto.cloudinary_public_id &&
-    data.cloudinary_public_id !== oldPhoto.cloudinary_public_id;
-
-  if (imageWasReplaced) {
-    try {
-      await deleteCloudinaryImage(oldPhoto.cloudinary_public_id);
-    } catch (error) {
-      console.error("Failed to delete old Cloudinary image:", error);
-    }
-  }
-
-  return updatedPhoto;
-}
-
-export async function deleteManagePhoto(photoId: number) {
-  const photo = await prisma.photos.findUnique({
-    where: {
-      photo_id: photoId,
-    },
-  });
-
-  if (!photo) {
-    return null;
-  }
-
-  if (photo.status === ReviewStatus.Kinnitatud) {
-    throw new Error("Kinnitatud fotot ei saa kustutada");
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.photos.delete({
-      where: {
-        photo_id: photoId,
-      },
-    });
-
-    await cleanupUnusedPhotoReferences(tx, {
-      city_id: photo.city_id,
-    });
-  });
-
-  if (photo.cloudinary_public_id) {
-    try {
-      await deleteCloudinaryImage(photo.cloudinary_public_id);
-    } catch (error) {
-      console.error("Failed to delete Cloudinary image:", error);
-    }
-  }
-
-  return photo;
-}
-function getPhotoApproveData(reviewerId?: number) {
-  return {
-    status: ReviewStatus.Kinnitatud,
-    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
-    reviewed_at: new Date(),
-    review_comment: null,
-  };
-}
-
-function getPhotoRejectData(reviewComment: string, reviewerId?: number) {
-  if (!reviewComment || !reviewComment.trim()) {
-    throw new Error("Reject comment is required");
-  }
-
-  return {
-    status: ReviewStatus.Tagasi_lukatud,
-    ...(reviewerId ? { reviewed_by: reviewerId } : {}),
-    reviewed_at: new Date(),
-    review_comment: reviewComment.trim(),
-  };
-}
-
-async function setPhotoCityStatus(
-  tx: Prisma.TransactionClient,
-  photoId: number,
-  data:
-    | ReturnType<typeof getPhotoApproveData>
-    | ReturnType<typeof getPhotoRejectData>
-) {
-  const photo = await tx.photos.findUnique({
-    where: {
-      photo_id: photoId,
-    },
-    include: {
-      city: true,
-    },
-  });
-
-  if (!photo?.city || photo.city.status === ReviewStatus.Kinnitatud) {
-    return;
-  }
-
-  await tx.cities.update({
-    where: {
-      city_id: photo.city.city_id,
-    },
-    data,
   });
 }
 
@@ -571,12 +432,7 @@ export async function pendingManagePhoto(photoId: number) {
       return null;
     }
 
-    const pendingData = {
-      status: ReviewStatus.Ootel,
-      reviewed_by: null,
-      reviewed_at: null,
-      review_comment: null,
-    };
+    const pendingData = getPendingReviewData();
 
     if (
       currentPhoto.city &&
@@ -595,6 +451,7 @@ export async function pendingManagePhoto(photoId: number) {
         photo_id: photoId,
       },
       data: pendingData,
+      include: managePhotoDetailInclude,
     });
   });
 }

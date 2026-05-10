@@ -9,7 +9,7 @@ type PhotoReferenceData = {
 type VehicleReferenceData = {
   model_id?: number | null;
   branch_id?: number | null;
-  photo_city_ids?: Array<number | null | undefined>;
+  photo_city_ids?: Array<number | null>;
 };
 
 async function cleanupUnusedCity(tx: Tx, cityId?: number | null) {
@@ -31,19 +31,17 @@ async function cleanupUnusedCity(tx: Tx, cityId?: number | null) {
     return;
   }
 
-  const [photosCount, branchesCount] = await Promise.all([
-    tx.photos.count({
-      where: {
-        city_id: cityId,
-      },
-    }),
+  const photosCount = await tx.photos.count({
+    where: {
+      city_id: cityId,
+    },
+  });
 
-    tx.company_branches.count({
-      where: {
-        city_id: cityId,
-      },
-    }),
-  ]);
+  const branchesCount = await tx.company_branches.count({
+    where: {
+      city_id: cityId,
+    },
+  });
 
   if (photosCount > 0 || branchesCount > 0) {
     return;

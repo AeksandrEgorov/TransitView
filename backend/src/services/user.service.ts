@@ -81,9 +81,11 @@ function mapAdminUserFromView(row: AdminUserViewRow) {
 
     vehicles_count: vehiclesTotal,
     photos_count: photosTotal,
+
     pending_vehicles_count: vehiclesPending,
     confirmed_vehicles_count: vehiclesConfirmed,
     rejected_vehicles_count: vehiclesRejected,
+
     pending_photos_count: photosPending,
     confirmed_photos_count: photosConfirmed,
     rejected_photos_count: photosRejected,
@@ -124,22 +126,20 @@ export async function getUsers(params: GetUsersParams) {
       ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
       : Prisma.empty;
 
-  const [items, totalRows] = await Promise.all([
-    prisma.$queryRaw<AdminUserViewRow[]>`
-      SELECT *
-      FROM ${Prisma.raw(dbView("v_admin_users"))} u
-      ${whereSql}
-      ORDER BY u.created_at DESC, u.user_id DESC
-      OFFSET ${skip}
-      LIMIT ${limit}
-    `,
+  const items = await prisma.$queryRaw<AdminUserViewRow[]>`
+    SELECT *
+    FROM ${Prisma.raw(dbView("v_admin_users"))} u
+    ${whereSql}
+    ORDER BY u.created_at DESC, u.user_id DESC
+    OFFSET ${skip}
+    LIMIT ${limit}
+  `;
 
-    prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) AS total
-      FROM ${Prisma.raw(dbView("v_admin_users"))} u
-      ${whereSql}
-    `,
-  ]);
+  const totalRows = await prisma.$queryRaw<CountRow[]>`
+    SELECT COUNT(*) AS total
+    FROM ${Prisma.raw(dbView("v_admin_users"))} u
+    ${whereSql}
+  `;
 
   const total = Number(totalRows[0]?.total ?? 0);
 
