@@ -18,6 +18,14 @@ import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
 import type { GalleryPhoto } from "../types/gallery";
 import type { VehicleCondition } from "../types/vehicle";
 
+const conditionOrder: VehicleCondition[] = [
+  "Töökorras",
+  "Ei_tööta",
+  "Maha_kantud",
+  "Müüdud",
+  "Teadmata",
+];
+
 function GalleryPage() {
   const { showToast } = useToast();
 
@@ -26,6 +34,15 @@ function GalleryPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [counties, setCounties] = useState<CountyItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
+
+  const [availableCategories, setAvailableCategories] = useState<
+    CategoryItem[]
+  >([]);
+  const [availableCounties, setAvailableCounties] = useState<CountyItem[]>([]);
+  const [availableCities, setAvailableCities] = useState<CityItem[]>([]);
+  const [availableConditions, setAvailableConditions] = useState<
+    VehicleCondition[]
+  >([]);
 
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
@@ -57,14 +74,6 @@ function GalleryPage() {
 
   const paginationRef = useRef<HTMLDivElement | null>(null);
   const shouldKeepPaginationVisibleRef = useRef(false);
-
-  const visibleCities = useMemo(() => {
-    if (!selectedCountyId) {
-      return cities;
-    }
-
-    return cities.filter((city) => city.county.county_id === selectedCountyId);
-  }, [cities, selectedCountyId]);
 
   const selectedPhotoIndex = selectedPhoto
     ? photos.findIndex((photo) => photo.photo_id === selectedPhoto.photo_id)
@@ -180,6 +189,124 @@ function GalleryPage() {
   }, [loadPhotos]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    async function hasResults(params: {
+      categoryId?: number;
+      countyId?: number;
+      cityId?: number;
+      condition?: VehicleCondition;
+    }) {
+      const data = await getPublicPhotos({
+        page: 1,
+        limit: 1,
+        regNumber: debouncedSearch || undefined,
+        categoryId: selectedCategoryId ?? undefined,
+        countyId: selectedCountyId ?? undefined,
+        cityId: selectedCityId ?? undefined,
+        condition: selectedCondition || undefined,
+        createdFrom: createdFrom || undefined,
+        createdTo: createdTo || undefined,
+        ...params,
+      });
+
+      return data.meta.total > 0;
+    }
+
+    async function loadAvailableFilterOptions() {
+      try {
+        const citySource = selectedCountyId
+          ? cities.filter((city) => city.county.county_id === selectedCountyId)
+          : cities;
+
+        const [nextCategories, nextCounties, nextCities, nextConditions] =
+          await Promise.all([
+            Promise.all(
+              categories.map(async (category) => {
+                const result = await hasResults({
+                  categoryId: category.category_id,
+                });
+
+                return result ? category : null;
+              })
+            ),
+
+            Promise.all(
+              counties.map(async (county) => {
+                const result = await hasResults({
+                  countyId: county.county_id,
+                  cityId: undefined,
+                });
+
+                return result ? county : null;
+              })
+            ),
+
+            Promise.all(
+              citySource.map(async (city) => {
+                const result = await hasResults({
+                  cityId: city.city_id,
+                });
+
+                return result ? city : null;
+              })
+            ),
+
+            Promise.all(
+              conditionOrder.map(async (condition) => {
+                const result = await hasResults({
+                  condition,
+                });
+
+                return result ? condition : null;
+              })
+            ),
+          ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setAvailableCategories(
+          nextCategories.filter((item): item is CategoryItem => Boolean(item))
+        );
+        setAvailableCounties(
+          nextCounties.filter((item): item is CountyItem => Boolean(item))
+        );
+        setAvailableCities(
+          nextCities.filter((item): item is CityItem => Boolean(item))
+        );
+        setAvailableConditions(
+          nextConditions.filter((item): item is VehicleCondition =>
+            Boolean(item)
+          )
+        );
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    if (categories.length > 0 || counties.length > 0 || cities.length > 0) {
+      loadAvailableFilterOptions();
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    categories,
+    counties,
+    cities,
+    debouncedSearch,
+    selectedCategoryId,
+    selectedCountyId,
+    selectedCityId,
+    selectedCondition,
+    createdFrom,
+    createdTo,
+  ]);
+
+  useEffect(() => {
     setPage(1);
     setSelectedPhoto(null);
   }, [
@@ -238,7 +365,8 @@ function GalleryPage() {
       (photo) => photo.photo_id === selectedPhoto.photo_id
     );
 
-    const previousIndex = currentIndex <= 0 ? photos.length - 1 : currentIndex - 1;
+    const previousIndex =
+      currentIndex <= 0 ? photos.length - 1 : currentIndex - 1;
     const previousPhoto = photos[previousIndex];
 
     if (previousPhoto) {
@@ -281,9 +409,10 @@ function GalleryPage() {
         selectedCondition={selectedCondition}
         createdFrom={createdFrom}
         createdTo={createdTo}
-        categories={categories}
-        counties={counties}
-        cities={visibleCities}
+        categories={availableCategories}
+        counties={availableCounties}
+        cities={availableCities}
+        conditions={availableConditions}
         onSearchChange={setSearch}
         onCategoryChange={setSelectedCategoryId}
         onCountyChange={handleCountyChange}
@@ -306,11 +435,23 @@ function GalleryPage() {
             </h2>
           </div>
 
-          <p className="text-sm font-semibold text-slate-500">
-            Leitud fotosid:{" "}
-            <span className="text-slate-900">{photos.length}</span> / Kokku:{" "}
-            <span className="text-slate-900">{totalPhotos}</span>
-          </p>
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
+            <span>
+              Leitud fotosid:{" "}
+              <span className="font-extrabold text-slate-950">
+                {photos.length}
+              </span>
+            </span>
+
+            <span className="text-slate-300">/</span>
+
+            <span>
+              Kokku:{" "}
+              <span className="font-extrabold text-slate-950">
+                {totalPhotos}
+              </span>
+            </span>
+          </div>
         </div>
 
         {isLoading ? (

@@ -27,3 +27,5 @@ export interface PublicFiltersResponse {
   vehicleFilters: PublicFilterGroup;
   photoFilters: PublicFilterGroup;
 }
+
+export type MyFiltersResponse = PublicFiltersResponse;

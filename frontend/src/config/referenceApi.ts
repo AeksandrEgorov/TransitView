@@ -1,13 +1,20 @@
 import api from "./axios";
+
 import type {
   CategoryItem,
   CityItem,
   CountyItem,
+  MyFiltersResponse,
   PublicFiltersResponse,
 } from "../types/reference";
 
 export async function getPublicFilters(): Promise<PublicFiltersResponse> {
   const response = await api.get("/reference/public-filters");
+  return response.data;
+}
+
+export async function getMyFilters(): Promise<MyFiltersResponse> {
+  const response = await api.get("/reference/my-filters");
   return response.data;
 }
 

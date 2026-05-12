@@ -1,19 +1,13 @@
-import { useState } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 
+import PublicFiltersPanel from "../ui/PublicFiltersPanel";
 import NativeDateInput from "../ui/NativeDateInput";
+
 import type { CategoryItem, CityItem, CountyItem } from "../../types/reference";
 import type { VehicleCondition } from "../../types/vehicle";
+
 import { formatVehicleCondition } from "../../utils/formatters";
 import { getTodayIsoDate } from "../../utils/date";
-
-const conditions: VehicleCondition[] = [
-  "Töökorras",
-  "Ei_tööta",
-  "Maha_kantud",
-  "Müüdud",
-  "Teadmata",
-];
 
 interface Props {
   search: string;
@@ -26,6 +20,7 @@ interface Props {
   categories: CategoryItem[];
   counties: CountyItem[];
   cities: CityItem[];
+  conditions: VehicleCondition[];
   onSearchChange: (value: string) => void;
   onCategoryChange: (value: number | null) => void;
   onCountyChange: (value: number | null) => void;
@@ -47,6 +42,7 @@ function VehicleFilters({
   categories,
   counties,
   cities,
+  conditions,
   onSearchChange,
   onCategoryChange,
   onCountyChange,
@@ -56,8 +52,6 @@ function VehicleFilters({
   onCreatedToChange,
   onReset,
 }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
-
   const today = getTodayIsoDate();
 
   const activeFiltersCount = [
@@ -92,78 +86,47 @@ function VehicleFilters({
   }
 
   return (
-    <section className="rounded-[30px] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80">
-      <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">
-              Filtrid
-            </p>
+    <PublicFiltersPanel
+      title="Leia sobiv sõiduk"
+      description="Filtreeri sõidukeid registrinumbri, kategooria, asukoha, seisundi ja lisamise kuupäeva järgi."
+      activeFiltersCount={activeFiltersCount}
+      onReset={onReset}
+    >
+      <div className="space-y-5">
+        <div>
+          <label className="mb-2 block text-sm font-bold text-slate-700">
+            Otsi registrinumbri järgi
+          </label>
 
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Leia sobiv sõiduk
-            </h2>
-
-            <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Filtreeri sõidukeid registrinumbri, kategooria, asukoha, seisundi
-              ja lisamise kuupäeva järgi.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {activeFiltersCount > 0 && (
-              <span className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
-                Aktiivseid filtreid: {activeFiltersCount}
-              </span>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsOpen((current) => !current)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              <SlidersHorizontal size={18} />
-              {isOpen ? "Peida filtrid" : "Näita filtreid"}
-              <ChevronDown
-                size={18}
-                className={`transition-transform duration-200 ${
-                  isOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className="space-y-6 p-5 sm:p-6">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Otsi registrinumbri järgi
-            </label>
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={18}
+            />
 
             <input
-              type="text"
               value={search}
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Näiteks 329 BRD"
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
           </div>
+        </div>
 
+        {categories.length > 0 && (
           <div>
-            <p className="mb-3 text-sm font-semibold text-slate-700">
+            <label className="mb-3 block text-sm font-bold text-slate-700">
               Vali transpordi liik
-            </p>
+            </label>
 
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => onCategoryChange(null)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                   selectedCategoryId === null
                     ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                 }`}
               >
                 Kõik
@@ -174,10 +137,10 @@ function VehicleFilters({
                   key={category.category_id}
                   type="button"
                   onClick={() => onCategoryChange(category.category_id)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                     selectedCategoryId === category.category_id
                       ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                   }`}
                 >
                   {category.name}
@@ -185,60 +148,61 @@ function VehicleFilters({
               ))}
             </div>
           </div>
+        )}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Maakond
-              </label>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              Maakond
+            </label>
 
-              <select
-                value={selectedCountyId ?? ""}
-                onChange={(event) =>
-                  onCountyChange(
-                    event.target.value ? Number(event.target.value) : null
-                  )
-                }
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              >
-                <option value="">Kõik maakonnad</option>
+            <select
+              value={selectedCountyId ?? ""}
+              onChange={(event) =>
+                onCountyChange(
+                  event.target.value ? Number(event.target.value) : null
+                )
+              }
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="">Kõik maakonnad</option>
 
-                {counties.map((county) => (
-                  <option key={county.county_id} value={county.county_id}>
-                    {county.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Linn
-              </label>
-
-              <select
-                value={selectedCityId ?? ""}
-                onChange={(event) =>
-                  onCityChange(
-                    event.target.value ? Number(event.target.value) : null
-                  )
-                }
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              >
-                <option value="">Kõik linnad</option>
-
-                {cities.map((city) => (
-                  <option key={city.city_id} value={city.city_id}>
-                    {city.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {counties.map((county) => (
+                <option key={county.county_id} value={county.county_id}>
+                  {county.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              Linn
+            </label>
+
+            <select
+              value={selectedCityId ?? ""}
+              onChange={(event) =>
+                onCityChange(
+                  event.target.value ? Number(event.target.value) : null
+                )
+              }
+              disabled={cities.length === 0}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              <option value="">Kõik linnad</option>
+
+              {cities.map((city) => (
+                <option key={city.city_id} value={city.city_id}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {conditions.length > 0 && (
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
+              <label className="mb-2 block text-sm font-bold text-slate-700">
                 Seisund
               </label>
 
@@ -247,7 +211,7 @@ function VehicleFilters({
                 onChange={(event) =>
                   onConditionChange(event.target.value as VehicleCondition | "")
                 }
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
               >
                 <option value="">Kõik seisundid</option>
 
@@ -258,45 +222,35 @@ function VehicleFilters({
                 ))}
               </select>
             </div>
+          )}
 
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Lisatud alates
-              </label>
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              Lisatud alates
+            </label>
 
-              <NativeDateInput
-                value={createdFrom}
-                max={createdTo || today}
-                onChange={handleCreatedFromChange}
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Lisatud kuni
-              </label>
-
-              <NativeDateInput
-                value={createdTo}
-                min={createdFrom || undefined}
-                max={today}
-                onChange={handleCreatedToChange}
-              />
-            </div>
+            <NativeDateInput
+              value={createdFrom}
+              max={createdTo || today}
+              onChange={handleCreatedFromChange}
+            />
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-5">
-            <button
-              type="button"
-              onClick={onReset}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              Lähtesta filtrid
-            </button>
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              Lisatud kuni
+            </label>
+
+            <NativeDateInput
+              value={createdTo}
+              min={createdFrom || undefined}
+              max={today}
+              onChange={handleCreatedToChange}
+            />
           </div>
         </div>
-      )}
-    </section>
+      </div>
+    </PublicFiltersPanel>
   );
 }
 
