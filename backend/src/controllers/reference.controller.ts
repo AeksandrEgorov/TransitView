@@ -1,5 +1,5 @@
 // This controller serves reference data for selects and filters.
-// Public filters only show approved data, while my/manage filters include the data those pages need.
+// Public vehicle location filters use photo cities, while my/manage filters include the data those pages need.
 
 import type { Request, Response } from "express";
 
@@ -82,30 +82,13 @@ export async function getPublicFilters(
 
     const vehicleCityRows = await prisma.$queryRaw<CityRow[]>`
       SELECT DISTINCT
-        location_rows.city_id,
-        location_rows.name,
-        location_rows.county_id,
-        location_rows.county_name
-      FROM (
-        SELECT
-          v.branch_city_id AS city_id,
-          v.branch_city_name AS name,
-          v.branch_county_id AS county_id,
-          v.branch_county_name AS county_name
-        FROM ${Prisma.raw(dbView("v_public_vehicles"))} v
-        WHERE v.branch_city_id IS NOT NULL
-
-        UNION
-
-        SELECT
-          p.city_id AS city_id,
-          p.city_name AS name,
-          p.county_id AS county_id,
-          p.county_name AS county_name
-        FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
-        WHERE p.city_id IS NOT NULL
-      ) location_rows
-      ORDER BY location_rows.name ASC
+        p.city_id,
+        p.city_name AS name,
+        p.county_id,
+        p.county_name
+      FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
+      WHERE p.city_id IS NOT NULL
+      ORDER BY p.city_name ASC
     `;
 
     const vehicleConditionRows = await prisma.$queryRaw<ConditionRow[]>`

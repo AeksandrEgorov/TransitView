@@ -910,28 +910,22 @@ export async function getPublicVehicles(params: GetPublicVehiclesParams) {
   }
 
   if (cityId || countyId) {
-    const branchLocationFilters: Prisma.Sql[] = [];
     const photoLocationFilters: Prisma.Sql[] = [];
 
     if (cityId) {
-      branchLocationFilters.push(Prisma.sql`v.branch_city_id = ${cityId}`);
       photoLocationFilters.push(Prisma.sql`p.city_id = ${cityId}`);
     }
 
     if (countyId) {
-      branchLocationFilters.push(Prisma.sql`v.branch_county_id = ${countyId}`);
       photoLocationFilters.push(Prisma.sql`p.county_id = ${countyId}`);
     }
 
     filters.push(Prisma.sql`
-      (
-        (${Prisma.join(branchLocationFilters, " AND ")})
-        OR EXISTS (
-          SELECT 1
-          FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
-          WHERE p.vehicle_id = v.vehicle_id
-            AND ${Prisma.join(photoLocationFilters, " AND ")}
-        )
+      EXISTS (
+        SELECT 1
+        FROM ${Prisma.raw(dbView("v_public_vehicle_photos"))} p
+        WHERE p.vehicle_id = v.vehicle_id
+          AND ${Prisma.join(photoLocationFilters, " AND ")}
       )
     `);
   }
