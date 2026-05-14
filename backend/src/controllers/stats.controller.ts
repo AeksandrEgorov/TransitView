@@ -1,3 +1,6 @@
+// This controller returns public, personal, and manage dashboard stats.
+// It keeps role checks close to the request before calling the stats service.
+
 import type { Response } from "express";
 import type { AuthRequest } from "../types/auth.js";
 import {

@@ -1,3 +1,5 @@
+// This file has the photo preview modal component.
+
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -11,15 +13,15 @@ import {
   X,
 } from "lucide-react";
 
-import Modal from "../ui/Modal";
-import type { GalleryPhoto } from "../../types/gallery";
-import type { VehicleItem, VehiclePhoto } from "../../types/vehicle";
+import Modal from "../../ui/Modal";
+import type { GalleryPhoto } from "../../../types/gallery";
+import type { VehicleItem, VehiclePhoto } from "../../../types/vehicle";
 import type {
   DashboardPhoto,
   DashboardVehicle,
   DashboardVehiclePhoto,
-} from "../../types/dashboard";
-import { getCloudinaryImageUrl } from "../../utils/cloudinary";
+} from "../../../types/dashboard";
+import { getCloudinaryImageUrl } from "../../../utils/cloudinary";
 
 type PreviewPhoto =
   | VehiclePhoto

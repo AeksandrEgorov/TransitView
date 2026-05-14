@@ -1,3 +1,5 @@
+// This file has the public stats section component.
+
 import { BarChart3, BusFront, Images, MapPin, Tags } from "lucide-react";
 import type { ReactNode } from "react";
 

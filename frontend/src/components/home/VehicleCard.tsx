@@ -1,10 +1,12 @@
+// This file has the vehicle card component.
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { VehicleItem } from "../../types/vehicle";
 
-import { formatVehicleCondition } from "../../utils/formatters";
 import { getCloudinaryImageUrl } from "../../utils/cloudinary";
+import StatusBadge from "../ui/StatusBadge";
 
 interface Props {
   vehicle: VehicleItem;
@@ -12,26 +14,6 @@ interface Props {
 
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString("et-EE");
-}
-
-function getConditionBadgeClass(condition: VehicleItem["condition"]) {
-  if (condition === "Töökorras") {
-    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
-  }
-
-  if (condition === "Ei_tööta") {
-    return "bg-amber-50 text-amber-700 ring-amber-200";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "bg-rose-50 text-rose-700 ring-rose-200";
-  }
-
-  if (condition === "Müüdud") {
-    return "bg-violet-50 text-violet-700 ring-violet-200";
-  }
-
-  return "bg-slate-100 text-slate-700 ring-slate-200";
 }
 
 function VehicleCard({ vehicle }: Props) {
@@ -78,13 +60,10 @@ function VehicleCard({ vehicle }: Props) {
           {vehicle.model.category.name}
         </div>
 
-        <div
-          className={`absolute right-4 top-4 rounded-full px-3 py-1.5 text-xs font-extrabold shadow-sm ring-1 ${getConditionBadgeClass(
-            vehicle.condition
-          )}`}
-        >
-          {formatVehicleCondition(vehicle.condition)}
-        </div>
+        <StatusBadge
+          condition={vehicle.condition}
+          className="absolute right-4 top-4"
+        />
 
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent px-5 pb-5 pt-16">
           <p className="text-2xl font-extrabold tracking-tight text-white">

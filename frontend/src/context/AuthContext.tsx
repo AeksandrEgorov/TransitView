@@ -1,3 +1,5 @@
+// This file has the auth context context.
+
 import { createContext } from "react";
 import type { AuthUser } from "../types/auth";
 

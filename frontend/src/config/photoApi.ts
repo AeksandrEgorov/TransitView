@@ -1,3 +1,5 @@
+// This file talks to the photo api.
+
 import api from "./axios";
 import type { VehicleCondition, VehiclePhoto } from "../types/vehicle";
 

@@ -1,11 +1,14 @@
+// This file has the create user modal component.
+
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldCheck, UserPlus, X } from "lucide-react";
 
 import {
   createManageUser,
   type ManageUserRole,
-} from "../../config/manageApi";
-import { useToast } from "../../hooks/useToast";
+} from "../../../config/manageApi";
+import { useToast } from "../../../hooks/useToast";
+import { reportError } from "../../../utils/logger";
 
 type AssignableRole = Exclude<ManageUserRole, "Administraator">;
 
@@ -129,7 +132,7 @@ function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalProps) {
 
       onSuccess();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",

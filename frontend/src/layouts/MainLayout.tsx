@@ -1,3 +1,6 @@
+// This layout is used by the public side of the site.
+// It keeps the shared header, footer, and page container around public routes.
+
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";

@@ -1,3 +1,5 @@
+// This file has the dashboard page header component.
+
 interface Props {
   eyebrow: string;
   title: string;

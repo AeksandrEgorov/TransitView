@@ -1,9 +1,11 @@
+// This file has the header component.
+
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-import LoginModal from "./modals/LoginModal";
-import LogoutModal from "./modals/LogoutModal";
+import LoginModal from "./modals/auth/LoginModal";
+import LogoutModal from "./modals/auth/LogoutModal";
 
 function Header() {
   const { user, isAuthenticated, logoutUser } = useAuth();

@@ -1,13 +1,34 @@
+// This file has date helpers.
+
 export function getTodayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+
+  return date.toISOString().slice(0, 10);
 }
 
-export function formatDateEt(dateString?: string | null) {
-  if (!dateString) {
+export function formatDateEt(value?: string | Date | null) {
+  if (!value) {
     return "Teadmata";
   }
 
-  return new Date(dateString).toLocaleDateString("et-EE");
+  return new Date(value).toLocaleDateString("et-EE");
+}
+
+export function toDateInputValue(value?: string | Date | null) {
+  if (!value) {
+    return getTodayIsoDate();
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return getTodayIsoDate();
+  }
+
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+
+  return date.toISOString().slice(0, 10);
 }
 
 export function isoToEstonianDate(value?: string | null) {

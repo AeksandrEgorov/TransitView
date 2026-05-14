@@ -1,3 +1,6 @@
+// This controller handles public and personal photo endpoints.
+// It validates photo data, handles optional image uploads, and checks who can edit or delete photos.
+
 import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";

@@ -1,3 +1,5 @@
+// This file has the review status badge component.
+
 import type { ReviewStatus } from "../../types/vehicle";
 
 interface Props {

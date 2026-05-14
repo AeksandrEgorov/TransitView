@@ -1,12 +1,13 @@
+// This file has the gallery photo card component.
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Camera, CalendarDays, ImageIcon, MapPin } from "lucide-react";
 
 import type { GalleryPhoto } from "../../types/gallery";
-import type { VehicleCondition } from "../../types/vehicle";
 
 import { getCloudinaryImageUrl } from "../../utils/cloudinary";
-import { formatVehicleCondition } from "../../utils/formatters";
+import StatusBadge from "../ui/StatusBadge";
 
 interface Props {
   photo: GalleryPhoto;
@@ -27,26 +28,6 @@ function getPhotoLocation(photo: GalleryPhoto) {
   }
 
   return `${photo.city.name}, ${photo.city.county.name}`;
-}
-
-function getConditionBadgeClass(condition: VehicleCondition) {
-  if (condition === "Töökorras") {
-    return "bg-emerald-50 text-emerald-700 ring-emerald-100";
-  }
-
-  if (condition === "Ei_tööta") {
-    return "bg-rose-50 text-rose-700 ring-rose-100";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "bg-slate-100 text-slate-700 ring-slate-200";
-  }
-
-  if (condition === "Müüdud") {
-    return "bg-violet-50 text-violet-700 ring-violet-100";
-  }
-
-  return "bg-white/90 text-slate-700 ring-slate-200";
 }
 
 function GalleryPhotoCard({ photo, onPreview }: Props) {
@@ -104,13 +85,10 @@ function GalleryPhotoCard({ photo, onPreview }: Props) {
           </div>
 
           {condition && (
-            <div
-              className={`absolute right-4 top-4 z-10 rounded-full px-3 py-1.5 text-xs font-extrabold shadow-sm ring-1 ${getConditionBadgeClass(
-                condition
-              )}`}
-            >
-              {formatVehicleCondition(condition)}
-            </div>
+            <StatusBadge
+              condition={condition}
+              className="absolute right-4 top-4 z-10"
+            />
           )}
 
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent px-4 pb-4 pt-12">

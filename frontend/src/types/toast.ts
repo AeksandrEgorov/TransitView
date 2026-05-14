@@ -1,3 +1,5 @@
+// This file has toast types.
+
 export type ToastVariant = "success" | "error" | "info";
 
 export interface ToastItem {

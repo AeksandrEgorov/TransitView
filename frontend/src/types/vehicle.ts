@@ -1,3 +1,5 @@
+// This file has vehicle types.
+
 export type VehicleCondition =
   | "Töökorras"
   | "Ei_tööta"

@@ -1,3 +1,5 @@
+// This file has photo manage types.
+
 export interface ManagePhotoListQuery {
   page?: string | string[];
   limit?: string | string[];

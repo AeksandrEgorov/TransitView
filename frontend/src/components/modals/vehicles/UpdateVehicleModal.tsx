@@ -1,11 +1,13 @@
+// This file has the update vehicle modal component.
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
-import Modal from "../ui/Modal";
-import RequiredLabel from "../ui/RequiredLabel";
-import NativeDateInput from "../ui/NativeDateInput";
+import Modal from "../../ui/Modal";
+import RequiredLabel from "../../ui/RequiredLabel";
+import NativeDateInput from "../../ui/NativeDateInput";
 
-import { createMyVehicle } from "../../config/dashboardApi";
+import { updateMyPhoto, updateMyVehicle } from "../../../config/dashboardApi";
 import {
   getCategories,
   getCities,
@@ -13,12 +15,19 @@ import {
   getCompanyBranches,
   getCounties,
   getModels,
-} from "../../config/referenceApi";
+} from "../../../config/referenceApi";
 
-import { useAuth } from "../../hooks/useAuth";
-import { useToast } from "../../hooks/useToast";
-import { getTodayIsoDate } from "../../utils/date";
+import { useToast } from "../../../hooks/useToast";
+import { reportError } from "../../../utils/logger";
+import { getCloudinaryImageUrl } from "../../../utils/cloudinary";
+import { getTodayIsoDate, toDateInputValue } from "../../../utils/date";
+import { formatVehicleCondition } from "../../../utils/formatters";
+import { isAllowedImageFile } from "../../../utils/images";
 
+import type {
+  DashboardVehicle,
+  DashboardVehiclePhoto,
+} from "../../../types/dashboard";
 import type {
   CategoryItem,
   CityItem,
@@ -26,17 +35,31 @@ import type {
   CompanyItem,
   CountyItem,
   ModelItem,
-} from "../../types/reference";
-import type { VehicleCondition } from "../../types/vehicle";
+} from "../../../types/reference";
+import type { VehicleCondition } from "../../../types/vehicle";
+
+type UpdateVehiclePayload = Parameters<typeof updateMyVehicle>[1];
+type UpdatePhotoPayload = Parameters<typeof updateMyPhoto>[1];
+
+type UpdateVehicleRequest = (
+  vehicleId: number,
+  data: UpdateVehiclePayload
+) => Promise<unknown>;
+
+type UpdatePhotoRequest = (
+  photoId: number,
+  data: UpdatePhotoPayload
+) => Promise<unknown>;
 
 interface Props {
   isOpen: boolean;
+  vehicle: DashboardVehicle | null;
   onClose: () => void;
   onSuccess: () => void;
-}
 
-const allowedImageTypes = ["image/jpeg", "image/png"];
-const allowedImageExtensions = [".jpg", ".jpeg", ".png"];
+  onUpdateVehicle?: UpdateVehicleRequest;
+  onUpdateFirstPhoto?: UpdatePhotoRequest;
+}
 
 const vehicleConditions: VehicleCondition[] = [
   "Töökorras",
@@ -46,35 +69,103 @@ const vehicleConditions: VehicleCondition[] = [
   "Teadmata",
 ];
 
-function isAllowedImageFile(file: File) {
-  const fileName = file.name.toLowerCase();
-
-  const hasAllowedType = allowedImageTypes.includes(file.type);
-  const hasAllowedExtension = allowedImageExtensions.some((extension) =>
-    fileName.endsWith(extension)
-  );
-
-  return hasAllowedType && hasAllowedExtension;
+function getVehicleCategoryId(vehicle: DashboardVehicle | null) {
+  return vehicle?.model?.category?.category_id
+    ? String(vehicle.model.category.category_id)
+    : "";
 }
 
-function formatCondition(condition: VehicleCondition) {
-  if (condition === "Ei_tööta") {
-    return "Ei tööta";
-  }
+function getVehicleModelId(vehicle: DashboardVehicle | null) {
+  const vehicleWithModelId = vehicle as
+    | (DashboardVehicle & { model_id?: number | null })
+    | null;
 
-  if (condition === "Maha_kantud") {
-    return "Maha kantud";
-  }
+  const modelWithId = vehicle?.model as { model_id?: number | null } | null;
 
-  return condition;
+  return vehicleWithModelId?.model_id ?? modelWithId?.model_id ?? null;
 }
 
-function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
-  const { isAuthenticated } = useAuth();
+function getVehicleBranchId(vehicle: DashboardVehicle | null) {
+  const vehicleWithBranchId = vehicle as
+    | (DashboardVehicle & { branch_id?: number | null })
+    | null;
+
+  const branchWithId = vehicle?.branch as { branch_id?: number | null } | null;
+
+  return vehicleWithBranchId?.branch_id ?? branchWithId?.branch_id ?? null;
+}
+
+function getPhotoCityId(photo?: DashboardVehiclePhoto | null) {
+  const photoWithCityId = photo as
+    | (DashboardVehiclePhoto & { city_id?: number | null })
+    | null
+    | undefined;
+
+  return photoWithCityId?.city_id ?? photo?.city?.city_id ?? null;
+}
+
+function mergeById<T>(
+  items: T[],
+  item: T | null | undefined,
+  getId: (value: T) => number | null | undefined
+) {
+  if (!item) {
+    return items;
+  }
+
+  const itemId = getId(item);
+
+  if (!itemId) {
+    return items;
+  }
+
+  const alreadyExists = items.some((current) => getId(current) === itemId);
+
+  if (alreadyExists) {
+    return items;
+  }
+
+  return [item, ...items];
+}
+
+function getCategoryId(category?: CategoryItem | null) {
+  return category?.category_id ?? null;
+}
+
+function getCountyId(county?: CountyItem | null) {
+  return county?.county_id ?? null;
+}
+
+function getCityId(city?: CityItem | null) {
+  return city?.city_id ?? null;
+}
+
+function getCompanyId(company?: CompanyItem | null) {
+  return company?.company_id ?? null;
+}
+
+function getBranchId(branch?: CompanyBranchItem | null) {
+  return branch?.branch_id ?? null;
+}
+
+function getModelId(model?: ModelItem | null) {
+  return model?.model_id ?? null;
+}
+
+function UpdateVehicleModal({
+  isOpen,
+  vehicle,
+  onClose,
+  onSuccess,
+  onUpdateVehicle,
+  onUpdateFirstPhoto,
+}: Props) {
   const { showToast } = useToast();
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const updateVehicleRequest = onUpdateVehicle ?? updateMyVehicle;
+  const updatePhotoRequest = onUpdateFirstPhoto ?? updateMyPhoto;
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const today = getTodayIsoDate();
 
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -86,8 +177,6 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
 
   const [isReferencesLoading, setIsReferencesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [useNewModel, setUseNewModel] = useState(false);
   const [categoryId, setCategoryId] = useState("");
@@ -122,33 +211,178 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
   const [chassis, setChassis] = useState("");
   const [condition, setCondition] = useState<VehicleCondition>("Teadmata");
 
+  const [selectedFirstPhotoFile, setSelectedFirstPhotoFile] =
+    useState<File | null>(null);
+
   const [photoCityId, setPhotoCityId] = useState("");
   const [useNewPhotoCity, setUseNewPhotoCity] = useState(false);
   const [newPhotoCityName, setNewPhotoCityName] = useState("");
   const [newPhotoCityCountyId, setNewPhotoCityCountyId] = useState("");
+  const [photoPlace, setPhotoPlace] = useState("");
+  const [photoTakenAt, setPhotoTakenAt] = useState(getTodayIsoDate());
 
-  const [place, setPlace] = useState("");
-  const [takenAt, setTakenAt] = useState(getTodayIsoDate());
+  const currentModelId = getVehicleModelId(vehicle);
+  const currentBranchId = getVehicleBranchId(vehicle);
+
+  const firstPhoto = vehicle?.photos?.[0] ?? null;
+  const firstPhotoCityId = getPhotoCityId(firstPhoto);
+  const firstPhotoInitialDate = toDateInputValue(firstPhoto?.taken_at);
+
+  const firstPhotoCanModify =
+    Boolean(firstPhoto) && firstPhoto?.status !== "Kinnitatud";
+
+  const isPhotoPlaceRequired = !useNewPhotoCity && photoCityId === "";
+
+  const firstPhotoUrl = firstPhoto?.file_path
+    ? getCloudinaryImageUrl(
+        firstPhoto.file_path,
+        "w_700,h_450,c_fill,q_auto,f_auto"
+      )
+    : "https://placehold.co/800x500/e2e8f0/475569?text=TransitView";
+
+  const currentCategory = useMemo(() => {
+    if (!vehicle?.model?.category) {
+      return null;
+    }
+
+    return {
+      ...vehicle.model.category,
+      category_id: vehicle.model.category.category_id,
+    } as CategoryItem;
+  }, [vehicle?.model?.category]);
+
+  const currentModel = useMemo(() => {
+    if (!vehicle?.model || !currentModelId) {
+      return null;
+    }
+
+    return {
+      ...vehicle.model,
+      model_id: currentModelId,
+      category_id: vehicle.model.category.category_id,
+      category: vehicle.model.category,
+    } as ModelItem;
+  }, [vehicle?.model, currentModelId]);
+
+  const currentCompany = useMemo(() => {
+    if (!vehicle?.branch?.company) {
+      return null;
+    }
+
+    return {
+      ...vehicle.branch.company,
+      company_id: vehicle.branch.company.company_id,
+    } as CompanyItem;
+  }, [vehicle?.branch?.company]);
+
+  const currentBranchCity = useMemo(() => {
+    if (!vehicle?.branch?.city?.county) {
+      return null;
+    }
+
+    return {
+      ...vehicle.branch.city,
+      city_id: vehicle.branch.city.city_id,
+      county_id: vehicle.branch.city.county.county_id,
+      county: vehicle.branch.city.county,
+    } as CityItem;
+  }, [vehicle?.branch?.city]);
+
+  const currentPhotoCity = useMemo(() => {
+    if (!firstPhoto?.city?.county) {
+      return null;
+    }
+
+    return {
+      ...firstPhoto.city,
+      city_id: firstPhoto.city.city_id,
+      county_id: firstPhoto.city.county.county_id,
+      county: firstPhoto.city.county,
+    } as CityItem;
+  }, [firstPhoto?.city]);
+
+  const currentBranch = useMemo(() => {
+    if (
+      !vehicle?.branch ||
+      !currentBranchId ||
+      !vehicle.branch.company ||
+      !vehicle.branch.city
+    ) {
+      return null;
+    }
+
+    return {
+      ...vehicle.branch,
+      branch_id: currentBranchId,
+      company_id: vehicle.branch.company.company_id,
+      city_id: vehicle.branch.city.city_id,
+      company: vehicle.branch.company,
+      city: vehicle.branch.city,
+    } as CompanyBranchItem;
+  }, [vehicle?.branch, currentBranchId]);
+
+  const categoriesForSelect = useMemo(() => {
+    return mergeById(categories, currentCategory, getCategoryId);
+  }, [categories, currentCategory]);
+
+  const modelsForSelect = useMemo(() => {
+    return mergeById(models, currentModel, getModelId);
+  }, [models, currentModel]);
+
+  const companiesForSelect = useMemo(() => {
+    return mergeById(companies, currentCompany, getCompanyId);
+  }, [companies, currentCompany]);
+
+  const citiesForSelect = useMemo(() => {
+    let nextCities = cities;
+
+    nextCities = mergeById(nextCities, currentBranchCity, getCityId);
+    nextCities = mergeById(nextCities, currentPhotoCity, getCityId);
+
+    return nextCities;
+  }, [cities, currentBranchCity, currentPhotoCity]);
+
+  const countiesForSelect = useMemo(() => {
+    let nextCounties = counties;
+
+    nextCounties = mergeById(
+      nextCounties,
+      currentBranchCity?.county as CountyItem | undefined,
+      getCountyId
+    );
+
+    nextCounties = mergeById(
+      nextCounties,
+      currentPhotoCity?.county as CountyItem | undefined,
+      getCountyId
+    );
+
+    return nextCounties;
+  }, [counties, currentBranchCity, currentPhotoCity]);
+
+  const branchesForSelect = useMemo(() => {
+    return mergeById(branches, currentBranch, getBranchId);
+  }, [branches, currentBranch]);
 
   const filteredModels = useMemo(() => {
     if (!categoryId) {
-      return models;
+      return modelsForSelect;
     }
 
-    return models.filter((model) => model.category_id === Number(categoryId));
-  }, [models, categoryId]);
+    return modelsForSelect.filter(
+      (model) => model.category_id === Number(categoryId)
+    );
+  }, [modelsForSelect, categoryId]);
 
   const filteredBranches = useMemo(() => {
     if (!companyFilterId) {
-      return branches;
+      return branchesForSelect;
     }
 
-    return branches.filter(
+    return branchesForSelect.filter(
       (branch) => branch.company_id === Number(companyFilterId)
     );
-  }, [branches, companyFilterId]);
-
-  const isPlaceRequired = !useNewPhotoCity && photoCityId === "";
+  }, [branchesForSelect, companyFilterId]);
 
   useEffect(() => {
     async function loadReferences() {
@@ -178,12 +412,12 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
         setBranches(branchesData);
         setCities(citiesData);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
           title: "Andmete laadimine ebaõnnestus",
-          message: "Sõiduki lisamise vormi andmeid ei õnnestunud laadida.",
+          message: "Sõiduki muutmise vormi andmeid ei õnnestunud laadida.",
         });
       } finally {
         setIsReferencesLoading(false);
@@ -195,20 +429,26 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
     }
   }, [isOpen, showToast]);
 
-  function resetForm() {
-    setSelectedFile(null);
+  useEffect(() => {
+    if (!isOpen || !vehicle) {
+      return;
+    }
+
+    const currentFirstPhoto = vehicle.photos?.[0] ?? null;
+    const currentFirstPhotoCityId = getPhotoCityId(currentFirstPhoto);
+    const nextModelId = getVehicleModelId(vehicle);
+    const nextBranchId = getVehicleBranchId(vehicle);
 
     setUseNewModel(false);
-    setCategoryId("");
-    setModelId("");
+    setCategoryId(getVehicleCategoryId(vehicle));
+    setModelId(nextModelId ? String(nextModelId) : "");
     setNewModelManufacturer("");
     setNewModelName("");
     setNewModelCategoryId("");
 
-    setCompanyFilterId("");
-    setBranchId("");
-
     setUseNewBranch(false);
+    setBranchId(nextBranchId ? String(nextBranchId) : "");
+    setCompanyFilterId("");
     setNewBranchName("");
 
     setUseNewBranchCompany(false);
@@ -225,44 +465,86 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
     setNewBranchCityName("");
     setNewBranchCityCountyId("");
 
-    setRegNumber("");
-    setVlaYear("");
-    setVinCode("");
-    setChassis("");
-    setCondition("Teadmata");
+    setRegNumber(vehicle.reg_number ?? "");
+    setVlaYear(vehicle.vla_year ? String(vehicle.vla_year) : "");
+    setVinCode(vehicle.vin_code ?? "");
+    setChassis(vehicle.chassis ?? "");
+    setCondition(vehicle.condition ?? "Teadmata");
 
-    setPhotoCityId("");
+    setSelectedFirstPhotoFile(null);
+    setPhotoCityId(
+      currentFirstPhotoCityId ? String(currentFirstPhotoCityId) : ""
+    );
     setUseNewPhotoCity(false);
     setNewPhotoCityName("");
     setNewPhotoCityCountyId("");
-
-    setPlace("");
-    setTakenAt(getTodayIsoDate());
+    setPhotoPlace(currentFirstPhoto?.place ?? "");
+    setPhotoTakenAt(toDateInputValue(currentFirstPhoto?.taken_at));
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }
+  }, [isOpen, vehicle]);
+
+  useEffect(() => {
+    if (!isOpen || !currentBranchId || branchesForSelect.length === 0) {
+      return;
+    }
+
+    const branch = branchesForSelect.find(
+      (item) => item.branch_id === currentBranchId
+    );
+
+    if (branch) {
+      setCompanyFilterId(String(branch.company_id));
+    }
+  }, [branchesForSelect, currentBranchId, isOpen]);
 
   function handleClose() {
     if (isSubmitting) {
       return;
     }
 
-    resetForm();
     onClose();
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  function handleUseNewModel(value: boolean) {
+    setUseNewModel(value);
+    setCategoryId(value ? "" : getVehicleCategoryId(vehicle));
+    setModelId(value ? "" : currentModelId ? String(currentModelId) : "");
+    setNewModelManufacturer("");
+    setNewModelName("");
+    setNewModelCategoryId("");
+  }
+
+  function handleUseNewBranch(value: boolean) {
+    setUseNewBranch(value);
+    setBranchId(value ? "" : currentBranchId ? String(currentBranchId) : "");
+    setCompanyFilterId("");
+    setNewBranchName("");
+    setUseNewBranchCompany(false);
+    setNewBranchCompanyId("");
+    setNewCompanyName("");
+    setUseNewCompanyCity(false);
+    setNewCompanyCityId("");
+    setNewCompanyCityName("");
+    setNewCompanyCityCountyId("");
+    setUseNewBranchCity(false);
+    setNewBranchCityId("");
+    setNewBranchCityName("");
+    setNewBranchCityCountyId("");
+  }
+
+  function handleFirstPhotoFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
 
     if (!file) {
-      setSelectedFile(null);
+      setSelectedFirstPhotoFile(null);
       return;
     }
 
     if (!isAllowedImageFile(file)) {
-      setSelectedFile(null);
+      setSelectedFirstPhotoFile(null);
       event.target.value = "";
 
       showToast({
@@ -274,34 +556,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
       return;
     }
 
-    setSelectedFile(file);
-  }
-
-  function handleUseNewModel(value: boolean) {
-    setUseNewModel(value);
-    setModelId("");
-    setCategoryId("");
-    setNewModelManufacturer("");
-    setNewModelName("");
-    setNewModelCategoryId("");
-  }
-
-  function handleUseNewBranch(value: boolean) {
-    setUseNewBranch(value);
-    setBranchId("");
-    setCompanyFilterId("");
-    setNewBranchName("");
-    setUseNewBranchCompany(false);
-    setNewBranchCompanyId("");
-    setNewCompanyName("");
-    setUseNewCompanyCity(false);
-    setNewCompanyCityId("");
-    setNewCompanyCityName("");
-    setNewCompanyCityCountyId("");
-    setUseNewBranchCity(false);
-    setNewBranchCityId("");
-    setNewBranchCityName("");
-    setNewBranchCityCountyId("");
+    setSelectedFirstPhotoFile(file);
   }
 
   function handleUseNewPhotoCity(value: boolean) {
@@ -315,12 +570,46 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
     }
   }
 
+  function isFirstPhotoChanged() {
+    if (!firstPhoto || !firstPhotoCanModify) {
+      return false;
+    }
+
+    if (selectedFirstPhotoFile) {
+      return true;
+    }
+
+    if (useNewPhotoCity) {
+      return true;
+    }
+
+    const nextCityId = photoCityId ? Number(photoCityId) : null;
+
+    if ((firstPhotoCityId ?? null) !== nextCityId) {
+      return true;
+    }
+
+    if ((firstPhoto.place ?? "") !== photoPlace.trim()) {
+      return true;
+    }
+
+    if (firstPhotoInitialDate !== photoTakenAt) {
+      return true;
+    }
+
+    return false;
+  }
+
   function validateForm() {
-    if (!isAuthenticated) {
+    if (!vehicle) {
+      return false;
+    }
+
+    if (vehicle.status === "Kinnitatud") {
       showToast({
         variant: "error",
-        title: "Sisselogimine on vajalik",
-        message: "Sõiduki lisamiseks pead olema sisse logitud.",
+        title: "Muutmine pole lubatud",
+        message: "Kinnitatud sõidukit ei saa muuta.",
       });
 
       return false;
@@ -428,78 +717,6 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
       return false;
     }
 
-    if (useNewPhotoCity) {
-      if (!newPhotoCityName.trim()) {
-        showToast({
-          variant: "error",
-          title: "Linna nimi puudub",
-          message: "Uue linna lisamiseks sisesta linna nimi.",
-        });
-
-        return false;
-      }
-
-      if (!newPhotoCityCountyId) {
-        showToast({
-          variant: "error",
-          title: "Maakond puudub",
-          message: "Uue linna lisamiseks vali maakond.",
-        });
-
-        return false;
-      }
-    }
-
-    if (isPlaceRequired && !place.trim()) {
-      showToast({
-        variant: "error",
-        title: "Koht puudub",
-        message: "Kui linn ei ole valitud, siis peab koht olema täidetud.",
-      });
-
-      return false;
-    }
-
-    if (!takenAt) {
-      showToast({
-        variant: "error",
-        title: "Kuupäev puudub",
-        message: "Pildistamise kuupäev peab olema täidetud.",
-      });
-
-      return false;
-    }
-
-    if (takenAt > today) {
-      showToast({
-        variant: "error",
-        title: "Vale kuupäev",
-        message: "Pildistamise kuupäev ei saa olla tulevikus.",
-      });
-
-      return false;
-    }
-
-    if (!selectedFile) {
-      showToast({
-        variant: "error",
-        title: "Foto puudub",
-        message: "Sõiduki lisamiseks peab olema vähemalt üks foto.",
-      });
-
-      return false;
-    }
-
-    if (!isAllowedImageFile(selectedFile)) {
-      showToast({
-        variant: "error",
-        title: "Vale failitüüp",
-        message: "Lubatud on ainult PNG, JPG või JPEG pildifailid.",
-      });
-
-      return false;
-    }
-
     const parsedYear = vlaYear ? Number(vlaYear) : null;
 
     if (
@@ -517,13 +734,77 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
       return false;
     }
 
+    if (firstPhotoCanModify) {
+      if (useNewPhotoCity) {
+        if (!newPhotoCityName.trim()) {
+          showToast({
+            variant: "error",
+            title: "Linna nimi puudub",
+            message: "Uue linna lisamiseks sisesta linna nimi.",
+          });
+
+          return false;
+        }
+
+        if (!newPhotoCityCountyId) {
+          showToast({
+            variant: "error",
+            title: "Maakond puudub",
+            message: "Uue linna lisamiseks vali maakond.",
+          });
+
+          return false;
+        }
+      }
+
+      if (isPhotoPlaceRequired && !photoPlace.trim()) {
+        showToast({
+          variant: "error",
+          title: "Koht puudub",
+          message: "Kui linn ei ole valitud, siis peab koht olema täidetud.",
+        });
+
+        return false;
+      }
+
+      if (!photoTakenAt) {
+        showToast({
+          variant: "error",
+          title: "Kuupäev puudub",
+          message: "Pildistamise kuupäev peab olema täidetud.",
+        });
+
+        return false;
+      }
+
+      if (photoTakenAt > today) {
+        showToast({
+          variant: "error",
+          title: "Vale kuupäev",
+          message: "Pildistamise kuupäev ei saa olla tulevikus.",
+        });
+
+        return false;
+      }
+
+      if (selectedFirstPhotoFile && !isAllowedImageFile(selectedFirstPhotoFile)) {
+        showToast({
+          variant: "error",
+          title: "Vale failitüüp",
+          message: "Lubatud on ainult PNG, JPG või JPEG pildifailid.",
+        });
+
+        return false;
+      }
+    }
+
     return true;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!validateForm() || !selectedFile) {
+    if (!validateForm() || !vehicle) {
       return;
     }
 
@@ -532,7 +813,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
     try {
       setIsSubmitting(true);
 
-      await createMyVehicle({
+      await updateVehicleRequest(vehicle.vehicle_id, {
         ...(useNewModel
           ? {
               new_model: {
@@ -580,51 +861,54 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                     }),
               },
             }
-          : branchId
-            ? {
-                branch_id: Number(branchId),
-              }
-            : {}),
+          : {
+              branch_id: branchId ? Number(branchId) : null,
+            }),
 
         reg_number: regNumber.trim().toUpperCase(),
         vla_year: parsedYear,
         vin_code: vinCode.trim() || null,
         chassis: chassis.trim() || null,
         condition,
-
-        ...(useNewPhotoCity
-          ? {
-              new_city: {
-                name: newPhotoCityName.trim(),
-                county_id: Number(newPhotoCityCountyId),
-              },
-            }
-          : photoCityId
-            ? {
-                city_id: Number(photoCityId),
-              }
-            : {}),
-
-        ...(place.trim() ? { place: place.trim() } : {}),
-        taken_at: new Date(`${takenAt}T00:00:00.000Z`).toISOString(),
-        image: selectedFile,
       });
+
+      if (firstPhoto && firstPhotoCanModify && isFirstPhotoChanged()) {
+        await updatePhotoRequest(firstPhoto.photo_id, {
+          ...(useNewPhotoCity
+            ? {
+                new_city: {
+                  name: newPhotoCityName.trim(),
+                  county_id: Number(newPhotoCityCountyId),
+                },
+              }
+            : photoCityId
+              ? {
+                  city_id: Number(photoCityId),
+                }
+              : {
+                  city_id: null,
+                }),
+
+          place: photoPlace.trim() || null,
+          taken_at: new Date(`${photoTakenAt}T00:00:00.000Z`).toISOString(),
+          ...(selectedFirstPhotoFile ? { image: selectedFirstPhotoFile } : {}),
+        });
+      }
 
       showToast({
         variant: "success",
-        title: "Sõiduk lisatud",
-        message: "Sõiduk ja esimene foto saadeti modereerimisele.",
+        title: "Sõiduk muudetud",
+        message: "Sõiduk saadeti uuesti modereerimisele.",
       });
 
-      resetForm();
       onSuccess();
       onClose();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",
-        title: "Sõiduki lisamine ebaõnnestus",
+        title: "Muutmine ebaõnnestus",
         message:
           "Kontrolli andmeid. Registrinumber võib juba olemas olla või mõni väli on vigane.",
       });
@@ -633,21 +917,24 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
     }
   }
 
+  if (!vehicle) {
+    return null;
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="xl">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">
-          Lisa sõiduk
+          Muuda sõidukit
         </p>
 
         <h2 className="mt-2 text-2xl font-bold text-slate-900">
-          Lisa uus sõidukikaart
+          Muuda sõidukikaarti
         </h2>
 
         <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">
-          Sõiduk lisatakse esmalt staatusega{" "}
-          <span className="font-semibold text-slate-900">Ootel</span>. Esimene
-          foto on kohustuslik.
+          Pärast muutmist pannakse sõiduk uuesti staatusega{" "}
+          <span className="font-semibold text-slate-900">Ootel</span>.
         </p>
 
         <p className="mt-3 text-xs text-slate-500">
@@ -690,7 +977,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                 >
                   <option value="">Kõik kategooriad / ära filtreeri</option>
 
-                  {categories.map((category) => (
+                  {categoriesForSelect.map((category) => (
                     <option
                       key={category.category_id}
                       value={category.category_id}
@@ -768,7 +1055,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                 >
                   <option value="">Vali kategooria</option>
 
-                  {categories.map((category) => (
+                  {categoriesForSelect.map((category) => (
                     <option
                       key={category.category_id}
                       value={category.category_id}
@@ -820,7 +1107,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                 >
                   <option value="">Kõik ettevõtted / ära filtreeri</option>
 
-                  {companies.map((company) => (
+                  {companiesForSelect.map((company) => (
                     <option key={company.company_id} value={company.company_id}>
                       {company.name}
                     </option>
@@ -842,8 +1129,8 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                   {filteredBranches.map((branch) => (
                     <option key={branch.branch_id} value={branch.branch_id}>
                       {branch.company.name} ·{" "}
-                      {branch.branch_name || "Peafiliaal"} ·{" "}
-                      {branch.city.name}, {branch.city.county.name}
+                      {branch.branch_name || "Peafiliaal"} · {branch.city.name},{" "}
+                      {branch.city.county.name}
                     </option>
                   ))}
                 </select>
@@ -873,6 +1160,10 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                         setUseNewBranchCompany(event.target.checked);
                         setNewBranchCompanyId("");
                         setNewCompanyName("");
+                        setUseNewCompanyCity(false);
+                        setNewCompanyCityId("");
+                        setNewCompanyCityName("");
+                        setNewCompanyCityCountyId("");
                       }}
                       className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
@@ -896,7 +1187,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                   >
                     <option value="">Vali ettevõte</option>
 
-                    {companies.map((company) => (
+                    {companiesForSelect.map((company) => (
                       <option
                         key={company.company_id}
                         value={company.company_id}
@@ -957,7 +1248,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                       >
                         <option value="">Vali linn</option>
 
-                        {cities.map((city) => (
+                        {citiesForSelect.map((city) => (
                           <option key={city.city_id} value={city.city_id}>
                             {city.name}, {city.county.name}
                           </option>
@@ -993,7 +1284,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                         >
                           <option value="">Vali maakond</option>
 
-                          {counties.map((county) => (
+                          {countiesForSelect.map((county) => (
                             <option
                               key={county.county_id}
                               value={county.county_id}
@@ -1045,7 +1336,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                     >
                       <option value="">Vali linn</option>
 
-                      {cities.map((city) => (
+                      {citiesForSelect.map((city) => (
                         <option key={city.city_id} value={city.city_id}>
                           {city.name}, {city.county.name}
                         </option>
@@ -1081,7 +1372,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
                       >
                         <option value="">Vali maakond</option>
 
-                        {counties.map((county) => (
+                        {countiesForSelect.map((county) => (
                           <option
                             key={county.county_id}
                             value={county.county_id}
@@ -1175,7 +1466,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
               >
                 {vehicleConditions.map((item) => (
                   <option key={item} value={item}>
-                    {formatCondition(item)}
+                    {formatVehicleCondition(item)}
                   </option>
                 ))}
               </select>
@@ -1188,160 +1479,184 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
             Esimene foto
           </h3>
 
-          <div className="mt-4 space-y-4">
-            <div>
-              <RequiredLabel required>Foto</RequiredLabel>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                onChange={handleFileChange}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                required
-              />
-
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Lubatud failitüübid: PNG, JPG, JPEG.
-              </p>
-
-              {selectedFile && (
-                <p className="mt-2 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 ring-1 ring-blue-100">
-                  Valitud fail:{" "}
-                  <span className="font-bold">{selectedFile.name}</span>
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <RequiredLabel required={useNewPhotoCity ? false : undefined}>
-                    Linn
-                  </RequiredLabel>
-
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Vali olemasolev linn, lisa uus linn või jäta linn tühjaks.
-                  </p>
+          {!firstPhoto ? (
+            <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200">
+              Sellel sõidukil ei ole esimest fotot. Foto andmeid ei saa siin
+              muuta.
+            </p>
+          ) : !firstPhotoCanModify ? (
+            <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200">
+              Esimene foto on kinnitatud ja seda ei saa muuta.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-[260px_minmax(0,1fr)]">
+                <div className="overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200">
+                  <img
+                    src={firstPhotoUrl}
+                    alt="Esimene foto"
+                    className="h-44 w-full object-cover"
+                  />
                 </div>
 
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100">
+                <div>
+                  <RequiredLabel>Uus foto</RequiredLabel>
+
                   <input
-                    type="checkbox"
-                    checked={useNewPhotoCity}
-                    onChange={(event) =>
-                      handleUseNewPhotoCity(event.target.checked)
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                    onChange={handleFirstPhotoFileChange}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   />
-                  Lisa uus linn
-                </label>
-              </div>
-
-              {!useNewPhotoCity ? (
-                <div className="mt-4">
-                  <select
-                    value={photoCityId}
-                    onChange={(event) => setPhotoCityId(event.target.value)}
-                    disabled={isReferencesLoading}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-60 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="">Linn puudub / väljaspool linna</option>
-
-                    {cities.map((city) => (
-                      <option key={city.city_id} value={city.city_id}>
-                        {city.name}, {city.county.name}
-                      </option>
-                    ))}
-                  </select>
 
                   <p className="mt-2 text-xs leading-5 text-slate-500">
-                    Kui linn puudub, siis on koha täitmine kohustuslik.
+                    Kui uut pilti ei vali, jääb vana foto alles. Lubatud
+                    failitüübid: PNG, JPG, JPEG.
                   </p>
-                </div>
-              ) : (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <RequiredLabel required>Uue linna nimi</RequiredLabel>
 
-                    <input
-                      type="text"
-                      value={newPhotoCityName}
-                      onChange={(event) =>
-                        setNewPhotoCityName(event.target.value)
-                      }
-                      placeholder="Näiteks Narva-Jõesuu"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                      required={useNewPhotoCity}
-                    />
+                  {selectedFirstPhotoFile && (
+                    <p className="mt-2 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 ring-1 ring-blue-100">
+                      Valitud fail:{" "}
+                      <span className="font-bold">
+                        {selectedFirstPhotoFile.name}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-700">Linn</p>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Vali olemasolev linn, lisa uus linn või jäta linn
+                      tühjaks.
+                    </p>
                   </div>
 
-                  <div>
-                    <RequiredLabel required>Maakond</RequiredLabel>
-
-                    <select
-                      value={newPhotoCityCountyId}
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100">
+                    <input
+                      type="checkbox"
+                      checked={useNewPhotoCity}
                       onChange={(event) =>
-                        setNewPhotoCityCountyId(event.target.value)
+                        handleUseNewPhotoCity(event.target.checked)
                       }
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Lisa uus linn
+                  </label>
+                </div>
+
+                {!useNewPhotoCity ? (
+                  <div className="mt-4">
+                    <select
+                      value={photoCityId}
+                      onChange={(event) => setPhotoCityId(event.target.value)}
                       disabled={isReferencesLoading}
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-60 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                      required={useNewPhotoCity}
                     >
-                      <option value="">Vali maakond</option>
+                      <option value="">Linn puudub / väljaspool linna</option>
 
-                      {counties.map((county) => (
-                        <option key={county.county_id} value={county.county_id}>
-                          {county.name}
+                      {citiesForSelect.map((city) => (
+                        <option key={city.city_id} value={city.city_id}>
+                          {city.name}, {city.county.name}
                         </option>
                       ))}
                     </select>
+
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      Kui linn puudub, siis on koha täitmine kohustuslik.
+                    </p>
                   </div>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <RequiredLabel required>Uue linna nimi</RequiredLabel>
 
-            <div>
-              <RequiredLabel required={isPlaceRequired}>Koht</RequiredLabel>
+                      <input
+                        type="text"
+                        value={newPhotoCityName}
+                        onChange={(event) =>
+                          setNewPhotoCityName(event.target.value)
+                        }
+                        placeholder="Näiteks Narva-Jõesuu"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      />
+                    </div>
 
-              <input
-                type="text"
-                value={place}
-                onChange={(event) => setPlace(event.target.value)}
-                placeholder="Näiteks bussijaam, tänav, peatus..."
-                maxLength={200}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                required={isPlaceRequired}
-              />
+                    <div>
+                      <RequiredLabel required>Maakond</RequiredLabel>
 
-              {isPlaceRequired ? (
+                      <select
+                        value={newPhotoCityCountyId}
+                        onChange={(event) =>
+                          setNewPhotoCityCountyId(event.target.value)
+                        }
+                        disabled={isReferencesLoading}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-60 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      >
+                        <option value="">Vali maakond</option>
+
+                        {countiesForSelect.map((county) => (
+                          <option
+                            key={county.county_id}
+                            value={county.county_id}
+                          >
+                            {county.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <RequiredLabel required={isPhotoPlaceRequired}>
+                  Koht
+                </RequiredLabel>
+
+                <input
+                  type="text"
+                  value={photoPlace}
+                  onChange={(event) => setPhotoPlace(event.target.value)}
+                  placeholder="Näiteks bussijaam, tänav, peatus..."
+                  maxLength={200}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  required={isPhotoPlaceRequired}
+                />
+
+                {isPhotoPlaceRequired ? (
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Koht on kohustuslik, sest linn ei ole valitud.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Kui linn on valitud või lisad uue linna, võib koha väli
+                    jääda tühjaks.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <RequiredLabel required>Pildistamise kuupäev</RequiredLabel>
+
+                <NativeDateInput
+                  value={photoTakenAt}
+                  onChange={setPhotoTakenAt}
+                  max={today}
+                  required
+                />
+
                 <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Koht on kohustuslik, sest linn ei ole valitud.
+                  Tuleviku kuupäeva ei saa valida.
                 </p>
-              ) : (
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Kui linn on valitud või lisad uue linna, võib koha väli jääda
-                  tühjaks.
-                </p>
-              )}
+              </div>
             </div>
-
-            <div>
-              <RequiredLabel required>Pildistamise kuupäev</RequiredLabel>
-
-              <NativeDateInput
-                value={takenAt}
-                onChange={setTakenAt}
-                max={today}
-                required
-              />
-
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Vaikimisi kasutatakse tänast kuupäeva. Tuleviku kuupäeva ei saa
-                valida.
-              </p>
-            </div>
-          </div>
+          )}
         </section>
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
@@ -1359,7 +1674,7 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
             disabled={isSubmitting || isReferencesLoading}
             className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isSubmitting ? "Lisamine..." : "Lisa sõiduk"}
+            {isSubmitting ? "Salvestan..." : "Salvesta muudatused"}
           </button>
         </div>
       </form>
@@ -1367,4 +1682,4 @@ function CreateVehicleModal({ isOpen, onClose, onSuccess }: Props) {
   );
 }
 
-export default CreateVehicleModal;
+export default UpdateVehicleModal;

@@ -1,3 +1,5 @@
+// This file has user types.
+
 import type { UserRole } from "../generated/prisma/client.js";
 
 export interface UserListQuery {

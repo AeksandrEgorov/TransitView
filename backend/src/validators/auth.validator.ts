@@ -1,3 +1,5 @@
+// This file checks auth request data.
+
 import { z } from "zod";
 
 export const loginSchema = z.object({

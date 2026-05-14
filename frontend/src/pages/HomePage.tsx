@@ -1,3 +1,6 @@
+// This page is the public vehicle browser on the front page.
+// It loads approved vehicles, public stats, and filters so visitors can search the collection.
+
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getVehicles } from "../config/vehicleApi";
@@ -10,6 +13,7 @@ import PageHero from "../components/ui/PageHero";
 import PublicStatsSection from "../components/ui/PublicStatsSection";
 
 import { useToast } from "../hooks/useToast";
+import { reportError } from "../utils/logger";
 import { useDebounce } from "../hooks/useDebounce";
 
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
@@ -87,7 +91,7 @@ function HomePage() {
         setCounties(data.vehicleFilters.counties);
         setCities(data.vehicleFilters.cities);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -109,7 +113,7 @@ function HomePage() {
 
         setPublicStats(data);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -145,7 +149,7 @@ function HomePage() {
         setTotalPages(Math.max(data.meta.totalPages, 1));
         setTotalVehicles(data.meta.total);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -265,7 +269,7 @@ function HomePage() {
           )
         );
       } catch (error) {
-        console.error(error);
+        reportError(error);
       }
     }
 

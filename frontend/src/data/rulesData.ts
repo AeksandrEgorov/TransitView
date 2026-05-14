@@ -1,3 +1,5 @@
+// This file stores rules data data.
+
 import { type Rule } from '../types/rule';
 
 export const GALLERY_RULES: Rule[] = [

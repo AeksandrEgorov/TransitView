@@ -1,3 +1,6 @@
+// This page shows the public photo gallery.
+// It loads approved photos, keeps filter state in sync, and opens the preview modal.
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
 
@@ -5,13 +8,14 @@ import PageHero from "../components/ui/PageHero";
 import PublicStatsSection from "../components/ui/PublicStatsSection";
 import GalleryFilters from "../components/gallery/GalleryFilters";
 import GalleryPhotoCard from "../components/gallery/GalleryPhotoCard";
-import PhotoPreviewModal from "../components/modals/PhotoPreviewModal";
+import PhotoPreviewModal from "../components/modals/photos/PhotoPreviewModal";
 
 import { getPublicPhotos } from "../config/photoApi";
 import { getPublicFilters } from "../config/referenceApi";
 import { getPublicStats, type PublicStats } from "../config/statsApi";
 
 import { useToast } from "../hooks/useToast";
+import { reportError } from "../utils/logger";
 import { useDebounce } from "../hooks/useDebounce";
 
 import type { CategoryItem, CityItem, CountyItem } from "../types/reference";
@@ -115,7 +119,7 @@ function GalleryPage() {
         return stillExists ?? null;
       });
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",
@@ -147,7 +151,7 @@ function GalleryPage() {
         setCounties(data.photoFilters.counties);
         setCities(data.photoFilters.cities);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -169,7 +173,7 @@ function GalleryPage() {
 
         setPublicStats(data);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -282,7 +286,7 @@ function GalleryPage() {
           )
         );
       } catch (error) {
-        console.error(error);
+        reportError(error);
       }
     }
 

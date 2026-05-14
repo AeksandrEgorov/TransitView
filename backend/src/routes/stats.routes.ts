@@ -1,3 +1,5 @@
+// This file sets up stats routes.
+
 import { Router } from "express";
 import {
   getManageStatsHandler,

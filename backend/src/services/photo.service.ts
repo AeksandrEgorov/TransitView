@@ -1,3 +1,6 @@
+// This service contains the main photo database logic.
+// It builds public/my photo queries and handles create, update, delete, and city reference cleanup.
+
 import prisma from "../config/prisma.js";
 import {
   Prisma,

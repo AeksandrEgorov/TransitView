@@ -1,3 +1,6 @@
+// This page is the main dashboard landing screen.
+// It loads user stats, manage stats when allowed, and quick links for the most common tasks.
+
 import { Link } from "react-router-dom";
 import { Camera, Car, ShieldCheck, Users } from "lucide-react";
 

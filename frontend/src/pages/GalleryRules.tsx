@@ -1,3 +1,6 @@
+// This page explains the gallery and upload rules.
+// It renders the rule data into readable sections with icons and status colors.
+
 import { GALLERY_RULES } from "../data/rulesData";
 import { type Rule } from "../types/rule";
 import { AlertTriangle, Ban, Info, FileText } from "lucide-react";

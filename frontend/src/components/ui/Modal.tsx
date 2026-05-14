@@ -1,3 +1,5 @@
+// This file has the modal component.
+
 import type { ReactNode } from "react";
 
 type ModalSize = "sm" | "md" | "lg" | "xl" | "full";

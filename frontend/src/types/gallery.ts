@@ -1,3 +1,5 @@
+// This file has gallery types.
+
 import type {
   VehicleBranch,
   VehicleCondition,

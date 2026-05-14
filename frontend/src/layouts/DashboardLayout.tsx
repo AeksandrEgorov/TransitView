@@ -1,3 +1,6 @@
+// This layout is used after login for dashboard pages.
+// It handles the sidebar/top navigation, logout flow, and the dashboard page wrapper.
+
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import {
@@ -10,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 
-import LogoutModal from "../components/modals/LogoutModal";
+import LogoutModal from "../components/modals/auth/LogoutModal";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 

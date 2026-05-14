@@ -1,4 +1,6 @@
-import Modal from "../ui/Modal";
+// This file has the pending confirm modal component.
+
+import Modal from "../../ui/Modal";
 
 interface Props {
   isOpen: boolean;

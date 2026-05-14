@@ -1,10 +1,13 @@
+// This file has the manage photos filters component.
+
 import { Search } from "lucide-react";
 
-import type { ManageUserOption } from "../../config/manageApi";
-import type { CategoryItem, CityItem, CountyItem } from "../../types/reference";
-import type { ReviewStatus, VehicleCondition } from "../../types/vehicle";
+import type { ManageUserOption } from "../../../config/manageApi";
+import type { CategoryItem, CityItem, CountyItem } from "../../../types/reference";
+import type { ReviewStatus, VehicleCondition } from "../../../types/vehicle";
+import { formatVehicleCondition } from "../../../utils/formatters";
 
-export interface ManageVehicleFilterState {
+export interface ManagePhotoFilterState {
   status: ReviewStatus | "";
   regNumber: string;
   categoryId: number | null;
@@ -17,16 +20,16 @@ export interface ManageVehicleFilterState {
 }
 
 interface Props {
-  filters: ManageVehicleFilterState;
+  filters: ManagePhotoFilterState;
   categories: CategoryItem[];
   counties: CountyItem[];
   cities: CityItem[];
   statuses: ReviewStatus[];
   conditions: VehicleCondition[];
   users: ManageUserOption[];
-  onChange: <K extends keyof ManageVehicleFilterState>(
+  onChange: <K extends keyof ManagePhotoFilterState>(
     key: K,
-    value: ManageVehicleFilterState[K]
+    value: ManagePhotoFilterState[K]
   ) => void;
 }
 
@@ -42,18 +45,6 @@ function formatStatus(status: ReviewStatus) {
   return "Tagasi lükatud";
 }
 
-function formatCondition(condition: VehicleCondition) {
-  if (condition === "Ei_tööta") {
-    return "Ei tööta";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "Maha kantud";
-  }
-
-  return condition;
-}
-
 function getUserLabel(user: ManageUserOption) {
   const username = user.username || "Nimetu kasutaja";
   const email = user.email ? ` · ${user.email}` : "";
@@ -61,7 +52,7 @@ function getUserLabel(user: ManageUserOption) {
   return `${username}${email}`;
 }
 
-function ManageVehiclesFilters({
+function ManagePhotosFilters({
   filters,
   categories,
   counties,
@@ -194,7 +185,7 @@ function ManageVehiclesFilters({
             onChange={(event) =>
               onChange(
                 "status",
-                event.target.value as ManageVehicleFilterState["status"]
+                event.target.value as ManagePhotoFilterState["status"]
               )
             }
             className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
@@ -219,7 +210,7 @@ function ManageVehiclesFilters({
             onChange={(event) =>
               onChange(
                 "condition",
-                event.target.value as ManageVehicleFilterState["condition"]
+                event.target.value as ManagePhotoFilterState["condition"]
               )
             }
             className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
@@ -228,7 +219,7 @@ function ManageVehiclesFilters({
 
             {conditions.map((condition) => (
               <option key={condition} value={condition}>
-                {formatCondition(condition)}
+                {formatVehicleCondition(condition)}
               </option>
             ))}
           </select>
@@ -291,4 +282,4 @@ function ManageVehiclesFilters({
   );
 }
 
-export default ManageVehiclesFilters;
+export default ManagePhotosFilters;

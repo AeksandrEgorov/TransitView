@@ -1,3 +1,6 @@
+// This file loads shared reference data like cities, categories, models, and filters.
+// Public, my, and manage pages use different filter endpoints because they show different data.
+
 import api from "./axios";
 
 import type {
@@ -6,6 +9,7 @@ import type {
   CompanyBranchItem,
   CompanyItem,
   CountyItem,
+  ManageFiltersResponse,
   ModelItem,
   MyFiltersResponse,
   PublicFiltersResponse,
@@ -18,6 +22,11 @@ export async function getPublicFilters(): Promise<PublicFiltersResponse> {
 
 export async function getMyFilters(): Promise<MyFiltersResponse> {
   const response = await api.get("/reference/my-filters");
+  return response.data;
+}
+
+export async function getManageFilters(): Promise<ManageFiltersResponse> {
+  const response = await api.get("/reference/manage-filters");
   return response.data;
 }
 

@@ -1,3 +1,5 @@
+// This file has the toast item component.
+
 import { useEffect, useState } from "react";
 import type { ToastItem as ToastItemType } from "../../types/toast";
 

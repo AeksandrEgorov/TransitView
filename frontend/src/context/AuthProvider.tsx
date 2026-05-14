@@ -1,3 +1,6 @@
+// This provider keeps the current login state for the frontend.
+// It loads saved auth data, exposes login/logout helpers, and reacts when the token expires.
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 

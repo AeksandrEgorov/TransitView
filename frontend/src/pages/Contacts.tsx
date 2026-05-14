@@ -1,3 +1,5 @@
+// This page shows the contact form and team contact cards.
+// It validates the form, sends messages to the backend, and gives the user toast feedback.
 import { useState } from "react";
 import type { FormEvent } from "react";
 import {
@@ -14,19 +16,16 @@ import PageHero from "../components/ui/PageHero";
 import RequiredLabel from "../components/ui/RequiredLabel";
 import { TEAM_DATA } from "../data/teamData";
 import { useToast } from "../hooks/useToast";
+import { sendContactMessage } from "../config/contactApi";
+import { reportError } from "../utils/logger";
 
 type ContactType = "account" | "question" | "bug" | "suggestion";
+
+const MIN_CONTACT_MESSAGE_LENGTH = 10;
 
 const iconMap = {
   admin: <ShieldCheck className="h-4 w-4" />,
   moderator: <UserCog className="h-4 w-4" />,
-};
-
-const contactTypeLabels: Record<ContactType, string> = {
-  account: "Kasutajakonto taotlus",
-  question: "Küsimus",
-  bug: "Veateade",
-  suggestion: "Ettepanek",
 };
 
 function getInitials(name: string) {
@@ -38,6 +37,24 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function getContactValidationMessage(error: unknown) {
+  const data = (error as {
+    response?: {
+      data?: {
+        errors?: {
+          message?: string[];
+        };
+      };
+    };
+  }).response?.data;
+
+  if (data?.errors?.message?.includes("message is too short")) {
+    return "Kirjuta sõnumisse vähemalt 10 tähemärki.";
+  }
+
+  return null;
+}
+
 function Contacts() {
   const { showToast } = useToast();
 
@@ -46,6 +63,7 @@ function Contacts() {
   const [email, setEmail] = useState("");
   const [topic, setTopic] = useState("");
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAccountRequest = contactType === "account";
 
@@ -67,34 +85,62 @@ function Contacts() {
     setMessage("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const contactData = {
-      form_type: contactType,
-      form_type_label: contactTypeLabels[contactType],
-      full_name: fullName.trim(),
-      email: email.trim(),
-      requested_role: isAccountRequest ? "Kasutaja" : "",
-      topic,
-      message: message.trim(),
-    };
+    const trimmedMessage = message.trim();
 
-    console.log("Contact form data:", contactData);
+    if (trimmedMessage.length < MIN_CONTACT_MESSAGE_LENGTH) {
+      showToast({
+        variant: "error",
+        title: "Sõnum on liiga lühike",
+        message: "Kirjuta sõnumisse vähemalt 10 tähemärki.",
+      });
 
-    showToast({
-      variant: "success",
-      title: isAccountRequest ? "Taotlus saadetud" : "Teade saadetud",
-      message: isAccountRequest
-        ? "Võtame teiega ühendust pärast andmete kontrollimist."
-        : "Aitäh! Võtame teiega ühendust esimesel võimalusel.",
-    });
+      return;
+    }
 
-    setContactType("question");
-    setFullName("");
-    setEmail("");
-    setTopic("");
-    setMessage("");
+    try {
+      setIsSubmitting(true);
+
+      await sendContactMessage({
+        contactType,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        topic: topic.trim(),
+        message: trimmedMessage,
+      });
+
+      showToast({
+        variant: "success",
+        title: isAccountRequest ? "Taotlus saadetud" : "Teade saadetud",
+        message: isAccountRequest
+          ? "Võtame teiega ühendust pärast andmete kontrollimist."
+          : "Aitäh! Võtame teiega ühendust esimesel võimalusel.",
+      });
+
+      setContactType("question");
+      setFullName("");
+      setEmail("");
+      setTopic("");
+      setMessage("");
+    } catch (error) {
+      reportError(error);
+
+      const validationMessage = getContactValidationMessage(error);
+
+      showToast({
+        variant: "error",
+        title: validationMessage
+          ? "Sõnum on liiga lühike"
+          : "Saatmine ebaõnnestus",
+        message:
+          validationMessage ??
+          "Teadet ei õnnestunud saata. Proovige hiljem uuesti või kirjutage otse e-postile.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -345,6 +391,7 @@ function Contacts() {
             <textarea
               name="message"
               rows={7}
+              minLength={MIN_CONTACT_MESSAGE_LENGTH}
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               placeholder={messagePlaceholder}
@@ -355,10 +402,15 @@ function Contacts() {
 
           <button
             type="submit"
-            className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-[0_14px_30px_rgba(37,99,235,0.25)] transition hover:bg-blue-700"
+            disabled={isSubmitting}
+            className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-[0_14px_30px_rgba(37,99,235,0.25)] transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
           >
             <Send className="h-5 w-5" />
-            {isAccountRequest ? "Saada konto taotlus" : "Saada teade"}
+            {isSubmitting
+              ? "Saadan..."
+              : isAccountRequest
+                ? "Saada konto taotlus"
+                : "Saada teade"}
           </button>
         </form>
       </section>

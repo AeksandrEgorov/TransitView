@@ -1,17 +1,22 @@
+// This file has the update photo modal component.
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
-import Modal from "../ui/Modal";
-import RequiredLabel from "../ui/RequiredLabel";
-import NativeDateInput from "../ui/NativeDateInput";
+import Modal from "../../ui/Modal";
+import RequiredLabel from "../../ui/RequiredLabel";
+import NativeDateInput from "../../ui/NativeDateInput";
 
-import { updateMyPhoto } from "../../config/dashboardApi";
-import { getCounties } from "../../config/referenceApi";
+import { updateMyPhoto } from "../../../config/dashboardApi";
+import { getCounties } from "../../../config/referenceApi";
 
-import { useToast } from "../../hooks/useToast";
-import { getCloudinaryImageUrl } from "../../utils/cloudinary";
+import { useToast } from "../../../hooks/useToast";
+import { reportError } from "../../../utils/logger";
+import { getCloudinaryImageUrl } from "../../../utils/cloudinary";
+import { getTodayIsoDate, toDateInputValue } from "../../../utils/date";
+import { isAllowedImageFile } from "../../../utils/images";
 
-import type { CityItem, CountyItem } from "../../types/reference";
+import type { CityItem, CountyItem } from "../../../types/reference";
 
 type UpdatePhotoPayload = Parameters<typeof updateMyPhoto>[1];
 
@@ -48,41 +53,6 @@ interface Props {
   onSuccess: () => void;
 
   onUpdatePhoto?: UpdatePhotoRequest;
-}
-
-const allowedImageTypes = ["image/jpeg", "image/png"];
-const allowedImageExtensions = [".jpg", ".jpeg", ".png"];
-
-function getTodayIsoDate() {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 10);
-}
-
-function toDateInputValue(value?: string | Date | null) {
-  if (!value) {
-    return getTodayIsoDate();
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return getTodayIsoDate();
-  }
-
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 10);
-}
-
-function isAllowedImageFile(file: File) {
-  const fileName = file.name.toLowerCase();
-
-  const hasAllowedType = allowedImageTypes.includes(file.type);
-  const hasAllowedExtension = allowedImageExtensions.some((extension) =>
-    fileName.endsWith(extension)
-  );
-
-  return hasAllowedType && hasAllowedExtension;
 }
 
 function getPhotoCityId(photo?: EditablePhoto | null) {
@@ -207,7 +177,7 @@ function UpdatePhotoModal({
         const countiesData = await getCounties();
         setCounties(countiesData);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -409,7 +379,7 @@ function UpdatePhotoModal({
       onSuccess();
       onClose();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",

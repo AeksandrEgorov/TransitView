@@ -1,3 +1,5 @@
+// This file has the dashboard filters panel component.
+
 import {
   ChevronDown,
   ChevronUp,

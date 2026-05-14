@@ -1,3 +1,6 @@
+// This page is the old/simple dashboard landing page.
+// The newer dashboard home does most of the real summary work, but this keeps a basic route available.
+
 import PageHero from "../components/ui/PageHero";
 
 function DashboardPage() {

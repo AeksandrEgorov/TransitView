@@ -1,3 +1,5 @@
+// This file has auth types.
+
 import type { Request } from "express";
 
 export type AppRole = "Kasutaja" | "Andmebaasi_toimetaja" | "Administraator";

@@ -1,3 +1,5 @@
+// This file has auth storage helpers.
+
 import type { AuthUser } from "../types/auth";
 
 const TOKEN_KEY = "token";

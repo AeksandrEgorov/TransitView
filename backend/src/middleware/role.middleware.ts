@@ -1,3 +1,5 @@
+// This file has role middleware.
+
 import type { Response, NextFunction } from "express";
 import type { AuthRequest, AppRole } from "../types/auth.js";
 

@@ -1,3 +1,6 @@
+// This service contains user database logic for the manage users page.
+// It reads the admin user view and creates, updates, or deletes user records safely.
+
 import prisma from "../config/prisma.js";
 import { Prisma, UserRole } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";

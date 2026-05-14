@@ -1,3 +1,5 @@
+// This file has dashboard types.
+
 import type { ReviewStatus, VehicleCondition } from "./vehicle";
 
 export interface DashboardMeta {

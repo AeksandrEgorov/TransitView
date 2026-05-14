@@ -1,3 +1,5 @@
+// This file has jwt helpers.
+
 import jwt from "jsonwebtoken";
 import type { JwtPayload } from "../types/auth.js";
 

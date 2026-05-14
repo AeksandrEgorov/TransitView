@@ -1,3 +1,5 @@
+// This file has the footer component.
+
 import { Link } from "react-router-dom";
 
 function Footer() {

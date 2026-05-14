@@ -1,3 +1,6 @@
+// This page shows a user's own vehicle with all its photos.
+// It lets the owner edit pending/rejected content and add or remove related photos.
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -15,11 +18,16 @@ import {
 
 import DashboardPageHeader from "../../components/dashboard/DashboardPageHeader";
 import ReviewStatusBadge from "../../components/dashboard/ReviewStatusBadge";
-import AddPhotoModal from "../../components/modals/AddPhotoModal";
-import UpdateVehicleModal from "../../components/modals/UpdateVehicleModal";
-import UpdatePhotoModal from "../../components/modals/UpdatePhotoModal";
-import PhotoPreviewModal from "../../components/modals/PhotoPreviewModal";
-import DeleteConfirmModal from "../../components/modals/DeleteConfirmModal";
+import {
+  ConditionInfoCard,
+  InfoCard,
+  VehiclePhotoCard,
+} from "../../components/dashboard/my-vehicle-detail/VehicleDetailCards";
+import AddPhotoModal from "../../components/modals/photos/AddPhotoModal";
+import UpdateVehicleModal from "../../components/modals/vehicles/UpdateVehicleModal";
+import UpdatePhotoModal from "../../components/modals/photos/UpdatePhotoModal";
+import PhotoPreviewModal from "../../components/modals/photos/PhotoPreviewModal";
+import DeleteConfirmModal from "../../components/modals/confirm/DeleteConfirmModal";
 
 import {
   deleteMyPhoto,
@@ -29,15 +37,14 @@ import {
 import { getCities } from "../../config/referenceApi";
 
 import { useToast } from "../../hooks/useToast";
+import { reportError } from "../../utils/logger";
 import { getCloudinaryImageUrl } from "../../utils/cloudinary";
-import { formatVehicleCondition } from "../../utils/formatters";
 
 import type { CityItem } from "../../types/reference";
 import type {
   DashboardVehicle,
   DashboardVehiclePhoto,
 } from "../../types/dashboard";
-import type { VehicleCondition } from "../../types/vehicle";
 
 function formatDate(dateString?: string | null) {
   if (!dateString) {
@@ -61,228 +68,6 @@ function getPhotoDate(photo?: DashboardVehiclePhoto | null) {
   }
 
   return formatDate(photo.taken_at);
-}
-
-function getConditionCardClass(condition: VehicleCondition) {
-  if (condition === "Töökorras") {
-    return "bg-emerald-50 ring-emerald-200";
-  }
-
-  if (condition === "Ei_tööta") {
-    return "bg-amber-50 ring-amber-200";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "bg-rose-50 ring-rose-200";
-  }
-
-  if (condition === "Müüdud") {
-    return "bg-violet-50 ring-violet-200";
-  }
-
-  return "bg-slate-100 ring-slate-200";
-}
-
-function getConditionTextClass(condition: VehicleCondition) {
-  if (condition === "Töökorras") {
-    return "text-emerald-700";
-  }
-
-  if (condition === "Ei_tööta") {
-    return "text-amber-700";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "text-rose-700";
-  }
-
-  if (condition === "Müüdud") {
-    return "text-violet-700";
-  }
-
-  return "text-slate-700";
-}
-
-function getUserLabel(
-  user?: {
-    username?: string | null;
-    email?: string | null;
-    role?: string | null;
-  } | null
-) {
-  if (!user) {
-    return "Kasutaja teadmata";
-  }
-
-  const username = user.username || "Nimetu kasutaja";
-  const email = user.email ? ` · ${user.email}` : "";
-  const role = user.role ? ` · ${user.role}` : "";
-
-  return `${username}${email}${role}`;
-}
-
-function InfoCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | null | undefined;
-}) {
-  return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-1 break-words text-sm font-semibold text-slate-800">
-        {value || "Teadmata"}
-      </p>
-    </div>
-  );
-}
-
-function ConditionInfoCard({ condition }: { condition: VehicleCondition }) {
-  return (
-    <div
-      className={`rounded-2xl px-4 py-3 ring-1 ${getConditionCardClass(
-        condition
-      )}`}
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-        Seisund
-      </p>
-
-      <p
-        className={`mt-1 text-sm font-bold ${getConditionTextClass(
-          condition
-        )}`}
-      >
-        {formatVehicleCondition(condition)}
-      </p>
-    </div>
-  );
-}
-
-function VehiclePhotoCard({
-  photo,
-  isFirstPhoto,
-  onPreview,
-  onEdit,
-  onDelete,
-}: {
-  photo: DashboardVehiclePhoto;
-  isFirstPhoto: boolean;
-  onPreview: (photo: DashboardVehiclePhoto) => void;
-  onEdit: (photo: DashboardVehiclePhoto) => void;
-  onDelete: (photo: DashboardVehiclePhoto) => void;
-}) {
-  const canModify = photo.status !== "Kinnitatud";
-
-  const photoUrl = photo.file_path
-    ? getCloudinaryImageUrl(
-        photo.file_path,
-        "w_850,h_560,c_fill,q_auto,f_auto"
-      )
-    : "https://placehold.co/900x600/e2e8f0/475569?text=TransitView";
-
-  return (
-    <article className="group overflow-hidden rounded-3xl bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(15,23,42,0.12)]">
-      <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <button
-          type="button"
-          onClick={() => onPreview(photo)}
-          className="relative min-h-72 overflow-hidden bg-slate-200 text-left xl:min-h-full"
-        >
-          <img
-            src={photoUrl}
-            alt="Sõiduki foto"
-            loading="lazy"
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-          />
-
-          {isFirstPhoto && (
-            <span className="absolute left-4 top-4 rounded-full bg-slate-950/80 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur">
-              Esimene foto
-            </span>
-          )}
-
-          {photo.status && (
-            <div className="absolute right-4 top-4">
-              <ReviewStatusBadge status={photo.status} />
-            </div>
-          )}
-
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent px-5 pb-5 pt-16">
-            <p className="text-base font-bold text-white">
-              {getPhotoLocation(photo)}
-            </p>
-
-            {photo.place && (
-              <p className="mt-1 text-sm font-medium text-slate-200">
-                {photo.place}
-              </p>
-            )}
-          </div>
-        </button>
-
-        <div className="flex flex-col justify-between gap-5 p-5">
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoCard label="Asukoht" value={getPhotoLocation(photo)} />
-              <InfoCard label="Lisatud" value={formatDate(photo.created_at)} />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoCard label="Koht" value={photo.place} />
-
-              {photo.author && (
-                <InfoCard label="Autor" value={getUserLabel(photo.author)} />
-              )}
-            </div>
-
-            {photo.review_comment && (
-              <div className="rounded-2xl bg-rose-50 p-4 text-sm font-medium text-rose-700 ring-1 ring-rose-100">
-                <span className="font-bold">Kommentaar: </span>
-                {photo.review_comment}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => onPreview(photo)}
-              className="inline-flex min-w-[130px] flex-1 items-center justify-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 sm:flex-none"
-            >
-              Vaata fotot
-            </button>
-
-            {canModify && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onEdit(photo)}
-                  className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 sm:flex-none"
-                >
-                  <Pencil size={16} />
-                  Muuda
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onDelete(photo)}
-                  className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-100 sm:flex-none"
-                >
-                  <Trash2 size={16} />
-                  Kustuta
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </article>
-  );
 }
 
 function MyVehicleDetailPage() {
@@ -360,7 +145,7 @@ function MyVehicleDetailPage() {
         return stillExists ?? null;
       });
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",
@@ -384,7 +169,7 @@ function MyVehicleDetailPage() {
         const data = await getCities();
         setCities(data);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -551,7 +336,7 @@ function MyVehicleDetailPage() {
 
       navigate("/dashboard/vehicles");
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",
@@ -616,7 +401,7 @@ function MyVehicleDetailPage() {
 
       loadVehicle();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",

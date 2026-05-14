@@ -1,3 +1,5 @@
+// This file has auth types.
+
 export type UserRole =
   | "Kasutaja"
   | "Andmebaasi_toimetaja"

@@ -1,4 +1,6 @@
-import ToastItem from "./toastItem";
+// This file has the toast container component.
+
+import ToastItem from "./ToastItem";
 import type { ToastItem as ToastItemType } from "../../types/toast";
 
 interface Props {

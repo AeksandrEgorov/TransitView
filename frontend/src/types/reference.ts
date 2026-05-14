@@ -1,3 +1,5 @@
+// This file has reference types.
+
 import type { VehicleCondition } from "./vehicle";
 
 export interface CategoryItem {
@@ -53,3 +55,4 @@ export interface PublicFiltersResponse {
 }
 
 export type MyFiltersResponse = PublicFiltersResponse;
+export type ManageFiltersResponse = PublicFiltersResponse;

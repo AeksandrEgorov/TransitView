@@ -1,3 +1,6 @@
+// This route guard checks if the logged-in user has one of the allowed roles.
+// It is used for editor/admin dashboard sections that normal users should not open.
+
 import { Navigate, Outlet } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";

@@ -1,3 +1,5 @@
+// This file has the required label component.
+
 import type { ReactNode } from "react";
 
 interface Props {

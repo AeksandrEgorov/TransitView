@@ -1,3 +1,5 @@
+// This file has rule types.
+
 export interface Rule {
   id: number;
   title: string;

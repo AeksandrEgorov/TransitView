@@ -1,3 +1,5 @@
+// This file has the update user modal component.
+
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldCheck, X } from "lucide-react";
 
@@ -5,8 +7,9 @@ import {
   updateManageUser,
   type ManageUserOption,
   type ManageUserRole,
-} from "../../config/manageApi";
-import { useToast } from "../../hooks/useToast";
+} from "../../../config/manageApi";
+import { useToast } from "../../../hooks/useToast";
+import { reportError } from "../../../utils/logger";
 
 type AssignableRole = Exclude<ManageUserRole, "Administraator">;
 
@@ -140,7 +143,7 @@ function UpdateUserModal({
 
       onSuccess();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",

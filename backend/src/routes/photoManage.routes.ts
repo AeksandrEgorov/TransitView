@@ -1,3 +1,5 @@
+// This file sets up photo manage routes.
+
 import { Router } from "express";
 
 import {

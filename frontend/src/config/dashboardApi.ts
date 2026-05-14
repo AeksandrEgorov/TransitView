@@ -1,3 +1,6 @@
+// This file groups API calls for the user's own dashboard.
+// It handles personal vehicle/photo lists and create, update, delete requests.
+
 import api from "./axios";
 
 import type {

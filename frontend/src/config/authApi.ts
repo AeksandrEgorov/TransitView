@@ -1,3 +1,5 @@
+// This file talks to the auth api.
+
 import api from "./axios";
 import type { AuthUser } from "../types/auth";
 

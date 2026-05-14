@@ -1,3 +1,6 @@
+// This file groups API calls for editor and admin screens.
+// It is used for moderation, manage filters, and admin user create/update/delete work.
+
 import api from "./axios";
 
 import type {

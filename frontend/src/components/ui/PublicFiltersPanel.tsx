@@ -1,3 +1,5 @@
+// This file has the public filters panel component.
+
 import {
   ChevronDown,
   ChevronUp,

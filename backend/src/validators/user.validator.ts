@@ -1,3 +1,5 @@
+// This file checks user request data.
+
 import { z } from "zod";
 
 export const createUserSchema = z.object({

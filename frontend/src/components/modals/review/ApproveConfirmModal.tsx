@@ -1,6 +1,8 @@
+// This file has the approve confirm modal component.
+
 import { CheckCircle2 } from "lucide-react";
 
-import Modal from "../ui/Modal";
+import Modal from "../../ui/Modal";
 
 interface Props {
   isOpen: boolean;

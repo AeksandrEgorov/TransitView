@@ -1,3 +1,6 @@
+// This service contains the main vehicle database logic.
+// It builds public/my queries, creates vehicles with the first photo, and keeps new references pending.
+
 import prisma from "../config/prisma.js";
 import {
   Prisma,
@@ -709,14 +712,9 @@ async function resetVehicleReferencesToPending(
     where: {
       vehicle_id: vehicleId,
     },
-    include: {
-      model: true,
-      branch: {
-        include: {
-          company: true,
-          city: true,
-        },
-      },
+    select: {
+      model_id: true,
+      branch_id: true,
     },
   });
 
@@ -724,7 +722,16 @@ async function resetVehicleReferencesToPending(
     return;
   }
 
-  if (vehicle.model.status !== ReviewStatus.Kinnitatud) {
+  const model = await tx.models.findUnique({
+    where: {
+      model_id: vehicle.model_id,
+    },
+    select: {
+      status: true,
+    },
+  });
+
+  if (model && model.status !== ReviewStatus.Kinnitatud) {
     await tx.models.update({
       where: {
         model_id: vehicle.model_id,
@@ -733,37 +740,72 @@ async function resetVehicleReferencesToPending(
     });
   }
 
-  if (vehicle.branch && vehicle.branch.status !== ReviewStatus.Kinnitatud) {
+  if (!vehicle.branch_id) {
+    return;
+  }
+
+  const branch = await tx.company_branches.findUnique({
+    where: {
+      branch_id: vehicle.branch_id,
+    },
+    select: {
+      status: true,
+      company_id: true,
+      city_id: true,
+    },
+  });
+
+  if (!branch) {
+    return;
+  }
+
+  if (branch.status !== ReviewStatus.Kinnitatud) {
     await tx.company_branches.update({
       where: {
-        branch_id: vehicle.branch.branch_id,
+        branch_id: vehicle.branch_id,
       },
       data: getPendingReviewData(),
     });
   }
 
-  if (
-    vehicle.branch?.company &&
-    vehicle.branch.company.status !== ReviewStatus.Kinnitatud
-  ) {
-    await tx.companies.update({
+  if (branch.company_id) {
+    const company = await tx.companies.findUnique({
       where: {
-        company_id: vehicle.branch.company.company_id,
+        company_id: branch.company_id,
       },
-      data: getPendingReviewData(),
+      select: {
+        status: true,
+      },
     });
+
+    if (company && company.status !== ReviewStatus.Kinnitatud) {
+      await tx.companies.update({
+        where: {
+          company_id: branch.company_id,
+        },
+        data: getPendingReviewData(),
+      });
+    }
   }
 
-  if (
-    vehicle.branch?.city &&
-    vehicle.branch.city.status !== ReviewStatus.Kinnitatud
-  ) {
-    await tx.cities.update({
+  if (branch.city_id) {
+    const city = await tx.cities.findUnique({
       where: {
-        city_id: vehicle.branch.city.city_id,
+        city_id: branch.city_id,
       },
-      data: getPendingReviewData(),
+      select: {
+        status: true,
+      },
     });
+
+    if (city && city.status !== ReviewStatus.Kinnitatud) {
+      await tx.cities.update({
+        where: {
+          city_id: branch.city_id,
+        },
+        data: getPendingReviewData(),
+      });
+    }
   }
 }
 
@@ -778,8 +820,9 @@ async function resetFirstVehiclePhotoToPending(
     orderBy: {
       created_at: "asc",
     },
-    include: {
-      city: true,
+    select: {
+      photo_id: true,
+      city_id: true,
     },
   });
 
@@ -787,13 +830,24 @@ async function resetFirstVehiclePhotoToPending(
     return;
   }
 
-  if (firstPhoto.city && firstPhoto.city.status !== ReviewStatus.Kinnitatud) {
-    await tx.cities.update({
+  if (firstPhoto.city_id) {
+    const city = await tx.cities.findUnique({
       where: {
-        city_id: firstPhoto.city.city_id,
+        city_id: firstPhoto.city_id,
       },
-      data: getPendingReviewData(),
+      select: {
+        status: true,
+      },
     });
+
+    if (city && city.status !== ReviewStatus.Kinnitatud) {
+      await tx.cities.update({
+        where: {
+          city_id: firstPhoto.city_id,
+        },
+        data: getPendingReviewData(),
+      });
+    }
   }
 
   await tx.photos.update({

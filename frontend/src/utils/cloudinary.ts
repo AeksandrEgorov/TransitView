@@ -1,3 +1,5 @@
+// This file has cloudinary helpers.
+
 import type { SyntheticEvent } from "react";
 
 export function getCloudinaryImageUrl(

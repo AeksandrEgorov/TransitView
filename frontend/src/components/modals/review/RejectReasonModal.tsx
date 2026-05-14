@@ -1,7 +1,9 @@
+// This file has the reject reason modal component.
+
 import { XCircle } from "lucide-react";
 
-import Modal from "../ui/Modal";
-import RequiredLabel from "../ui/RequiredLabel";
+import Modal from "../../ui/Modal";
+import RequiredLabel from "../../ui/RequiredLabel";
 
 interface Props {
   isOpen: boolean;

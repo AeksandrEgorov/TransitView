@@ -1,3 +1,5 @@
+// This file has auth middleware.
+
 import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "../types/auth.js";
 import { verifyToken } from "../utils/jwt.js";

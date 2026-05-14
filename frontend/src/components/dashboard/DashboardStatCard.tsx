@@ -1,3 +1,5 @@
+// This file has the dashboard stat card component.
+
 import type { ReactNode } from "react";
 
 interface Props {

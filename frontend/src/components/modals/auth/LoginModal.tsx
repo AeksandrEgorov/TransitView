@@ -1,11 +1,14 @@
+// This file has the login modal component.
+
 import { useState } from "react";
 import type { FormEvent } from "react";
 
-import Modal from "../ui/Modal";
-import RequiredLabel from "../ui/RequiredLabel";
-import { login } from "../../config/authApi";
-import { useAuth } from "../../hooks/useAuth";
-import { useToast } from "../../hooks/useToast";
+import Modal from "../../ui/Modal";
+import RequiredLabel from "../../ui/RequiredLabel";
+import { login } from "../../../config/authApi";
+import { useAuth } from "../../../hooks/useAuth";
+import { useToast } from "../../../hooks/useToast";
+import { reportError } from "../../../utils/logger";
 
 interface Props {
   isOpen: boolean;
@@ -45,7 +48,7 @@ function LoginModal({ isOpen, onClose }: Props) {
       setPassword("");
       onClose();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       setErrorMessage("Vale kasutajanimi või parool");
 

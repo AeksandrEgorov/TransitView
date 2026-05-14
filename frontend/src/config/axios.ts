@@ -1,3 +1,6 @@
+// This file creates the shared axios client for backend requests.
+// It adds the JWT token when possible and clears auth when the backend returns 401.
+
 import axios from "axios";
 
 import { emitAuthLogout } from "../utils/authEvents";

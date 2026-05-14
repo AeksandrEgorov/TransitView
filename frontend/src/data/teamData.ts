@@ -1,3 +1,5 @@
+// This file stores team data data.
+
 export interface TeamMember {
   id: number;
   name: string;

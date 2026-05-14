@@ -1,3 +1,5 @@
+// This file has the vehicle filters component.
+
 import { Search } from "lucide-react";
 
 import PublicFiltersPanel from "../ui/PublicFiltersPanel";

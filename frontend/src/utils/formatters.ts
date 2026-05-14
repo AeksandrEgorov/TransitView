@@ -1,3 +1,5 @@
+// This file has formatters helpers.
+
 import type { VehicleCondition } from "../types/vehicle";
 
 export function formatVehicleCondition(condition: VehicleCondition) {

@@ -1,3 +1,6 @@
+// This page shows one public vehicle in detail.
+// It loads the approved vehicle, its photo list, and lets visitors open photo previews.
+
 import { Link, useParams } from "react-router-dom";
 import {
   useCallback,
@@ -20,14 +23,16 @@ import { getVehicleById } from "../config/vehicleApi";
 import { getPhotosByVehicleId } from "../config/photoApi";
 import { getCities } from "../config/referenceApi";
 import PageHero from "../components/ui/PageHero";
-import AddPhotoModal from "../components/modals/AddPhotoModal";
-import PhotoPreviewModal from "../components/modals/PhotoPreviewModal";
+import AddPhotoModal from "../components/modals/photos/AddPhotoModal";
+import PhotoPreviewModal from "../components/modals/photos/PhotoPreviewModal";
 import { useToast } from "../hooks/useToast";
+import { reportError } from "../utils/logger";
 import { useAuth } from "../hooks/useAuth";
 import type { CityItem } from "../types/reference";
 import type { VehicleItem, VehiclePhoto } from "../types/vehicle";
 import { formatVehicleCondition } from "../utils/formatters";
 import { getCloudinaryImageUrl } from "../utils/cloudinary";
+import { getConditionStyles } from "../utils/conditionStyles";
 
 function formatDate(dateString?: string | null) {
   if (!dateString) {
@@ -51,46 +56,6 @@ function getPhotoDate(photo?: VehiclePhoto | null) {
   }
 
   return formatDate(photo.taken_at);
-}
-
-function getConditionCardClass(condition: VehicleItem["condition"]) {
-  if (condition === "Töökorras") {
-    return "bg-emerald-50 ring-emerald-200";
-  }
-
-  if (condition === "Ei_tööta") {
-    return "bg-amber-50 ring-amber-200";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "bg-rose-50 ring-rose-200";
-  }
-
-  if (condition === "Müüdud") {
-    return "bg-violet-50 ring-violet-200";
-  }
-
-  return "bg-slate-100 ring-slate-200";
-}
-
-function getConditionTextClass(condition: VehicleItem["condition"]) {
-  if (condition === "Töökorras") {
-    return "text-emerald-700";
-  }
-
-  if (condition === "Ei_tööta") {
-    return "text-amber-700";
-  }
-
-  if (condition === "Maha_kantud") {
-    return "text-rose-700";
-  }
-
-  if (condition === "Müüdud") {
-    return "text-violet-700";
-  }
-
-  return "text-slate-700";
 }
 
 function InfoCard({
@@ -120,19 +85,15 @@ function ConditionInfoCard({
 }) {
   return (
     <div
-      className={`rounded-2xl px-4 py-3 ring-1 ${getConditionCardClass(
+      className={`rounded-2xl px-4 py-3 ring-1 ${getConditionStyles(
         condition
       )}`}
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-current opacity-70">
         Seisund
       </p>
 
-      <p
-        className={`mt-1 text-sm font-bold ${getConditionTextClass(
-          condition
-        )}`}
-      >
+      <p className="mt-1 text-sm font-bold">
         {formatVehicleCondition(condition)}
       </p>
     </div>
@@ -265,7 +226,7 @@ function VehicleDetailPage() {
       const data = await getVehicleById(vehicleId);
       setVehicle(data);
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",
@@ -307,7 +268,7 @@ function VehicleDetailPage() {
         return stillExists ?? null;
       });
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",
@@ -333,7 +294,7 @@ function VehicleDetailPage() {
         const data = await getCities();
         setCities(data);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",

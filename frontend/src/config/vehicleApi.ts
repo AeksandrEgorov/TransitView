@@ -1,3 +1,5 @@
+// This file talks to the vehicle api.
+
 import api from "./axios";
 import type { VehicleItem, VehicleListResponse, VehicleQueryParams } from "../types/vehicle";
 

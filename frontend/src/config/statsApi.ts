@@ -1,3 +1,5 @@
+// This file talks to the stats api.
+
 import api from "./axios";
 
 interface PublicStatsResponse {

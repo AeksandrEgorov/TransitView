@@ -1,3 +1,5 @@
+// This file has the native date input component.
+
 interface Props {
   value: string;
   onChange: (value: string) => void;

@@ -1,4 +1,6 @@
-import Modal from "../ui/Modal";
+// This file has the logout modal component.
+
+import Modal from "../../ui/Modal";
 
 interface Props {
   isOpen: boolean;

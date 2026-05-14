@@ -1,3 +1,6 @@
+// This service builds the counts shown on public and dashboard summary cards.
+// It reads database views so the frontend gets small ready-to-use stat objects.
+
 import prisma from "../config/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";

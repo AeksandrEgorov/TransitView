@@ -1,3 +1,5 @@
+// This file has the page hero component.
+
 interface PageHeroProps {
   eyebrow: string;
   title: string;

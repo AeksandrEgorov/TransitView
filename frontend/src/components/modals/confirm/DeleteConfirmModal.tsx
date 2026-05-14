@@ -1,6 +1,8 @@
+// This file has the delete confirm modal component.
+
 import { AlertTriangle, Trash2, X } from "lucide-react";
 
-import Modal from "../ui/Modal";
+import Modal from "../../ui/Modal";
 
 interface Props {
   isOpen: boolean;

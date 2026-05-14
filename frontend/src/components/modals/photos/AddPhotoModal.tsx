@@ -1,15 +1,19 @@
+// This file has the add photo modal component.
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
-import Modal from "../ui/Modal";
-import RequiredLabel from "../ui/RequiredLabel";
-import NativeDateInput from "../ui/NativeDateInput";
-import { createPhoto, uploadPhotoFile } from "../../config/photoApi";
-import { getCounties } from "../../config/referenceApi";
-import { useAuth } from "../../hooks/useAuth";
-import { useToast } from "../../hooks/useToast";
-import type { CityItem, CountyItem } from "../../types/reference";
-import { getTodayIsoDate } from "../../utils/date";
+import Modal from "../../ui/Modal";
+import RequiredLabel from "../../ui/RequiredLabel";
+import NativeDateInput from "../../ui/NativeDateInput";
+import { createPhoto, uploadPhotoFile } from "../../../config/photoApi";
+import { getCounties } from "../../../config/referenceApi";
+import { useAuth } from "../../../hooks/useAuth";
+import { useToast } from "../../../hooks/useToast";
+import { reportError } from "../../../utils/logger";
+import type { CityItem, CountyItem } from "../../../types/reference";
+import { getTodayIsoDate } from "../../../utils/date";
+import { isAllowedImageFile } from "../../../utils/images";
 
 interface Props {
   isOpen: boolean;
@@ -17,20 +21,6 @@ interface Props {
   cities: CityItem[];
   onClose: () => void;
   onSuccess: () => void;
-}
-
-const allowedImageTypes = ["image/jpeg", "image/png"];
-const allowedImageExtensions = [".jpg", ".jpeg", ".png"];
-
-function isAllowedImageFile(file: File) {
-  const fileName = file.name.toLowerCase();
-
-  const hasAllowedType = allowedImageTypes.includes(file.type);
-  const hasAllowedExtension = allowedImageExtensions.some((extension) =>
-    fileName.endsWith(extension)
-  );
-
-  return hasAllowedType && hasAllowedExtension;
 }
 
 function AddPhotoModal({
@@ -85,7 +75,7 @@ function AddPhotoModal({
         const data = await getCounties();
         setCounties(data);
       } catch (error) {
-        console.error(error);
+        reportError(error);
 
         showToast({
           variant: "error",
@@ -283,7 +273,7 @@ function AddPhotoModal({
       onSuccess();
       onClose();
     } catch (error) {
-      console.error(error);
+      reportError(error);
 
       showToast({
         variant: "error",

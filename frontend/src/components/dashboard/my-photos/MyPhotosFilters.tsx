@@ -1,12 +1,14 @@
+// This file has the my photos filters component.
+
 import { Search } from "lucide-react";
 
-import NativeDateInput from "../ui/NativeDateInput";
+import NativeDateInput from "../../ui/NativeDateInput";
 
-import type { CategoryItem, CityItem, CountyItem } from "../../types/reference";
-import type { ReviewStatus, VehicleCondition } from "../../types/vehicle";
+import type { CategoryItem, CityItem, CountyItem } from "../../../types/reference";
+import type { ReviewStatus, VehicleCondition } from "../../../types/vehicle";
 
-import { formatVehicleCondition } from "../../utils/formatters";
-import { getTodayIsoDate } from "../../utils/date";
+import { formatVehicleCondition } from "../../../utils/formatters";
+import { getTodayIsoDate } from "../../../utils/date";
 
 export type MyPhotoFilterState = {
   status: ReviewStatus | "";

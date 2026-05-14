@@ -1,3 +1,6 @@
+// This controller serves reference data for selects and filters.
+// Public filters only show approved data, while my/manage filters include the data those pages need.
+
 import type { Request, Response } from "express";
 
 import prisma from "../config/prisma.js";
@@ -251,6 +254,87 @@ export async function getMyFilters(
     });
   } catch (error) {
     console.error("Get my filters error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getManageFilters(
+  _req: AuthRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const vehicleCategories = await prisma.$queryRaw<CategoryRow[]>`
+      SELECT DISTINCT
+        v.category_id,
+        v.category_name AS name
+      FROM ${Prisma.raw(dbView("v_manage_vehicles"))} v
+      WHERE v.category_id IS NOT NULL
+      ORDER BY name ASC
+    `;
+
+    const vehicleCityRows = await prisma.$queryRaw<CityRow[]>`
+      SELECT DISTINCT
+        p.city_id,
+        p.city_name AS name,
+        p.county_id,
+        p.county_name
+      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+      WHERE p.city_id IS NOT NULL
+      ORDER BY p.city_name ASC
+    `;
+
+    const vehicleConditionRows = await prisma.$queryRaw<ConditionRow[]>`
+      SELECT DISTINCT
+        v.condition::text AS condition
+      FROM ${Prisma.raw(dbView("v_manage_vehicles"))} v
+      WHERE v.condition IS NOT NULL
+      ORDER BY condition ASC
+    `;
+
+    const photoCategories = await prisma.$queryRaw<CategoryRow[]>`
+      SELECT DISTINCT
+        p.category_id,
+        p.category_name AS name
+      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+      WHERE p.category_id IS NOT NULL
+      ORDER BY name ASC
+    `;
+
+    const photoCityRows = await prisma.$queryRaw<CityRow[]>`
+      SELECT DISTINCT
+        p.city_id,
+        p.city_name AS name,
+        p.county_id,
+        p.county_name
+      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+      WHERE p.city_id IS NOT NULL
+      ORDER BY p.city_name ASC
+    `;
+
+    const photoConditionRows = await prisma.$queryRaw<ConditionRow[]>`
+      SELECT DISTINCT
+        p.vehicle_condition::text AS condition
+      FROM ${Prisma.raw(dbView("v_manage_photos"))} p
+      WHERE p.vehicle_condition IS NOT NULL
+      ORDER BY condition ASC
+    `;
+
+    res.status(200).json({
+      vehicleFilters: {
+        categories: vehicleCategories,
+        counties: buildCountiesFromCities(vehicleCityRows),
+        cities: mapCityRows(vehicleCityRows),
+        conditions: mapConditions(vehicleConditionRows),
+      },
+      photoFilters: {
+        categories: photoCategories,
+        counties: buildCountiesFromCities(photoCityRows),
+        cities: mapCityRows(photoCityRows),
+        conditions: mapConditions(photoConditionRows),
+      },
+    });
+  } catch (error) {
+    console.error("Get manage filters error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
