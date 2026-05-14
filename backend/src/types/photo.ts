@@ -1,3 +1,5 @@
+// This file has photo types.
+
 import type { VehicleCondition } from "../generated/prisma/client.js";
 
 export interface PhotoListQuery {

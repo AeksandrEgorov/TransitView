@@ -1,3 +1,6 @@
+// This controller handles login and the current-user endpoint.
+// It validates credentials, checks the password hash, and returns the JWT payload the frontend stores.
+
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import prisma from "../config/prisma.js";

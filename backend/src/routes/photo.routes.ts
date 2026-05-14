@@ -1,3 +1,5 @@
+// This file sets up photo routes.
+
 import { Router } from "express";
 import {
   uploadPhotoHandler,

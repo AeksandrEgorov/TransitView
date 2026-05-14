@@ -1,3 +1,6 @@
+// This controller handles public and personal vehicle endpoints.
+// It parses filters, validates create/update data, checks permissions, and formats HTTP responses.
+
 import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";

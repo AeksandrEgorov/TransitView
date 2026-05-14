@@ -1,3 +1,6 @@
+// This seed file resets useful demo data and database views.
+// It loads sample vehicles/photos/users, hashes env-based passwords, and creates the public/manage views.
+
 import "dotenv/config";
 import bcrypt from "bcrypt";
 import {
@@ -937,7 +940,14 @@ async function seedUsers() {
   const resultByUsername = new Map<string, number>();
 
   for (const user of users) {
-    const password = user.password ?? "Password123!";
+    const password = process.env[user.passwordEnv];
+
+    if (!password) {
+      throw new Error(
+        `${user.passwordEnv} is required for seed user ${user.username}`
+      );
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const createdUser = await prisma.users.create({

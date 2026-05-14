@@ -1,3 +1,5 @@
+// This file has vehicle manage types.
+
 export interface ManageVehicleListQuery {
   page?: string | string[];
   limit?: string | string[];

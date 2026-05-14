@@ -1,3 +1,5 @@
+// This file has db view helpers.
+
 const DB_SCHEMA = process.env.DB_SCHEMA ?? "transitview";
 
 function quoteIdentifier(identifier: string) {

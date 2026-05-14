@@ -1,3 +1,6 @@
+// This service removes unused pending reference records.
+// It helps keep new cities, branches, companies, and models from staying around after drafts are deleted.
+
 import { Prisma, ReviewStatus } from "../generated/prisma/client.js";
 
 type Tx = Prisma.TransactionClient;

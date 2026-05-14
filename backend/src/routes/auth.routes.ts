@@ -1,3 +1,5 @@
+// This file sets up auth routes.
+
 import { Router } from "express";
 import { login, getMe } from "../controllers/auth.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";

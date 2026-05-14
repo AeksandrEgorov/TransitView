@@ -1,3 +1,6 @@
+// This service contains editor/admin photo moderation logic.
+// It reads manage photo views and updates photo review status with related city status when needed.
+
 import prisma from "../config/prisma.js";
 import {
   Prisma,
@@ -255,18 +258,31 @@ async function setPhotoCityStatus(
     where: {
       photo_id: photoId,
     },
-    include: {
-      city: true,
+    select: {
+      city_id: true,
     },
   });
 
-  if (!photo?.city || photo.city.status === ReviewStatus.Kinnitatud) {
+  if (!photo?.city_id) {
+    return;
+  }
+
+  const city = await tx.cities.findUnique({
+    where: {
+      city_id: photo.city_id,
+    },
+    select: {
+      status: true,
+    },
+  });
+
+  if (!city || city.status === ReviewStatus.Kinnitatud) {
     return;
   }
 
   await tx.cities.update({
     where: {
-      city_id: photo.city.city_id,
+      city_id: photo.city_id,
     },
     data,
   });
@@ -382,19 +398,20 @@ export async function approveManagePhoto(
   photoId: number,
   reviewerId?: number
 ) {
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const reviewData = getPhotoApproveData(reviewerId);
 
     await setPhotoCityStatus(tx, photoId, reviewData);
 
-    return tx.photos.update({
+    await tx.photos.update({
       where: {
         photo_id: photoId,
       },
       data: reviewData,
-      include: managePhotoDetailInclude,
     });
   });
+
+  return getManagePhotoById(photoId);
 }
 
 export async function rejectManagePhoto(
@@ -402,29 +419,30 @@ export async function rejectManagePhoto(
   reviewComment: string,
   reviewerId?: number
 ) {
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const reviewData = getPhotoRejectData(reviewComment, reviewerId);
 
     await setPhotoCityStatus(tx, photoId, reviewData);
 
-    return tx.photos.update({
+    await tx.photos.update({
       where: {
         photo_id: photoId,
       },
       data: reviewData,
-      include: managePhotoDetailInclude,
     });
   });
+
+  return getManagePhotoById(photoId);
 }
 
 export async function pendingManagePhoto(photoId: number) {
-  return prisma.$transaction(async (tx) => {
+  const wasUpdated = await prisma.$transaction(async (tx) => {
     const currentPhoto = await tx.photos.findUnique({
       where: {
         photo_id: photoId,
       },
-      include: {
-        city: true,
+      select: {
+        city_id: true,
       },
     });
 
@@ -434,24 +452,35 @@ export async function pendingManagePhoto(photoId: number) {
 
     const pendingData = getPendingReviewData();
 
-    if (
-      currentPhoto.city &&
-      currentPhoto.city.status !== ReviewStatus.Kinnitatud
-    ) {
-      await tx.cities.update({
+    if (currentPhoto.city_id) {
+      const city = await tx.cities.findUnique({
         where: {
-          city_id: currentPhoto.city.city_id,
+          city_id: currentPhoto.city_id,
         },
-        data: pendingData,
+        select: {
+          status: true,
+        },
       });
+
+      if (city && city.status !== ReviewStatus.Kinnitatud) {
+        await tx.cities.update({
+          where: {
+            city_id: currentPhoto.city_id,
+          },
+          data: pendingData,
+        });
+      }
     }
 
-    return tx.photos.update({
+    await tx.photos.update({
       where: {
         photo_id: photoId,
       },
       data: pendingData,
-      include: managePhotoDetailInclude,
     });
+
+    return true;
   });
+
+  return wasUpdated ? getManagePhotoById(photoId) : null;
 }

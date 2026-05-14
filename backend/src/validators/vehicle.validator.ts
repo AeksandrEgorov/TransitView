@@ -1,3 +1,6 @@
+// This validator checks vehicle create and update request bodies.
+// It also makes sure new model, company, branch, and city fields are sent together correctly.
+
 import { z } from "zod";
 
 const vehicleConditionSchema = z.enum([

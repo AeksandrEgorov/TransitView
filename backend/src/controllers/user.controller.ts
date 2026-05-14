@@ -1,3 +1,6 @@
+// This controller handles admin/editor user management.
+// It validates user changes, protects admin accounts, hashes passwords, and blocks unsafe deletes.
+
 import type { Response } from "express";
 import bcrypt from "bcrypt";
 

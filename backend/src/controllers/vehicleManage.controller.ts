@@ -1,3 +1,6 @@
+// This controller handles editor/admin vehicle moderation endpoints.
+// It reads manage filters, opens vehicle detail data, and moves vehicles between review statuses.
+
 import type { NextFunction, Request, Response } from "express";
 
 import {

@@ -1,3 +1,5 @@
+// This file sets up user routes.
+
 import { Router } from "express";
 
 import {

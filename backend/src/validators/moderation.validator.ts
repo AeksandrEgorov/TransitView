@@ -1,3 +1,5 @@
+// This file checks moderation request data.
+
 import { z } from "zod";
 
 import {

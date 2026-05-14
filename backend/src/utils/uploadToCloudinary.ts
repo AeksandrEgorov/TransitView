@@ -1,3 +1,5 @@
+// This file has upload to cloudinary helpers.
+
 import streamifier from "streamifier";
 import cloudinary from "../config/cloudinary.js";
 

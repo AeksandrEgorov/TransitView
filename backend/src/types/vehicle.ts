@@ -1,3 +1,5 @@
+// This file has vehicle types.
+
 export interface VehicleListQuery {
   page?: string;
   limit?: string;

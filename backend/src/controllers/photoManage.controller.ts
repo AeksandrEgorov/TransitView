@@ -1,3 +1,6 @@
+// This controller handles editor/admin photo moderation endpoints.
+// It supports manage list filters and approve, reject, pending, edit, and delete actions.
+
 import type { Response } from "express";
 
 import type { AuthRequest } from "../types/auth.js";

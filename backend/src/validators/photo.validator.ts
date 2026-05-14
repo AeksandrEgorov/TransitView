@@ -1,3 +1,6 @@
+// This validator checks photo create and update request bodies.
+// It supports existing cities, new city fields, optional dates, and uploaded image metadata.
+
 import { z } from "zod";
 
 const optionalNullableString = (maxLength: number, fieldName: string) =>
