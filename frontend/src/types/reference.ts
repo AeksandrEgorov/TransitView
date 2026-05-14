@@ -16,6 +16,30 @@ export interface CityItem {
   county: CountyItem;
 }
 
+export interface ModelItem {
+  model_id: number;
+  manufacturer: string;
+  name: string;
+  category_id: number;
+  category: CategoryItem;
+}
+
+export interface CompanyItem {
+  company_id: number;
+  name: string;
+  city_id?: number | null;
+  city?: CityItem | null;
+}
+
+export interface CompanyBranchItem {
+  branch_id: number;
+  company_id: number;
+  city_id: number;
+  branch_name: string | null;
+  company: CompanyItem;
+  city: CityItem;
+}
+
 export interface PublicFilterGroup {
   categories: CategoryItem[];
   counties: CountyItem[];

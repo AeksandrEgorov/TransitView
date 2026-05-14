@@ -37,6 +37,10 @@ interface UploadPhotoResponse {
 interface CreatePhotoRequest {
   vehicle_id: number;
   city_id?: number;
+  new_city?: {
+    name: string;
+    county_id: number;
+  };
   place?: string;
   taken_at?: string;
   file_path: string;

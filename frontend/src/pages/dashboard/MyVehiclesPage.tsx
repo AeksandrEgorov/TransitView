@@ -21,8 +21,15 @@ import MyVehiclesFilters, {
   type MyVehicleFilterState,
 } from "../../components/dashboard/MyVehiclesFilters";
 import AddPhotoModal from "../../components/modals/AddPhotoModal";
+import CreateVehicleModal from "../../components/modals/CreateVehicleModal";
+import UpdateVehicleModal from "../../components/modals/UpdateVehicleModal";
+import DeleteConfirmModal from "../../components/modals/DeleteConfirmModal";
 
-import { getMyVehicles } from "../../config/dashboardApi";
+import {
+  deleteMyVehicle,
+  getMyVehicleById,
+  getMyVehicles,
+} from "../../config/dashboardApi";
 import { getCities, getMyFilters } from "../../config/referenceApi";
 import { getMyStats } from "../../config/statsApi";
 
@@ -128,7 +135,7 @@ function MyVehicleCard({
 
   const canModify = vehicle.status !== "Kinnitatud";
   const canOpenPublicView = vehicle.status === "Kinnitatud";
-  const coverPhoto = vehicle.photos[0];
+  const coverPhoto = vehicle.photos?.[0] ?? null;
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -173,8 +180,8 @@ function MyVehicleCard({
         </div>
 
         <div className="p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
+          <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <h3 className="text-2xl font-extrabold text-slate-950">
                   {vehicle.reg_number}
@@ -197,55 +204,59 @@ function MyVehicleCard({
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Link
-                to={`/dashboard/vehicles/${vehicle.vehicle_id}`}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                <Eye size={16} />
-                Vaata detailsemalt
-              </Link>
-
-              {canOpenPublicView && (
+            <div className="flex w-full flex-col gap-3 2xl:w-auto 2xl:min-w-[420px]">
+              <div className="flex flex-wrap gap-2 2xl:justify-end">
                 <Link
-                  to={`/vehicles/${vehicle.vehicle_id}`}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                  to={`/dashboard/vehicles/${vehicle.vehicle_id}`}
+                  className="inline-flex min-w-[165px] flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 2xl:flex-none"
                 >
-                  <ShieldCheck size={16} />
-                  Avalik vaade
+                  <Eye size={16} />
+                  Vaata detailsemalt
                 </Link>
-              )}
 
-              <button
-                type="button"
-                onClick={() => onAddPhoto(vehicle.vehicle_id)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700"
-              >
-                <Plus size={16} />
-                Lisa foto
-              </button>
-
-              {canModify && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onEdit(vehicle)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
+                {canOpenPublicView && (
+                  <Link
+                    to={`/vehicles/${vehicle.vehicle_id}`}
+                    className="inline-flex min-w-[135px] flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800 2xl:flex-none"
                   >
-                    <Pencil size={16} />
-                    Muuda
-                  </button>
+                    <ShieldCheck size={16} />
+                    Avalik vaade
+                  </Link>
+                )}
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => onDelete(vehicle)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
-                  >
-                    <Trash2 size={16} />
-                    Kustuta
-                  </button>
-                </>
-              )}
+              <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3 2xl:justify-end">
+                <button
+                  type="button"
+                  onClick={() => onAddPhoto(vehicle.vehicle_id)}
+                  className="inline-flex min-w-[120px] flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 2xl:flex-none"
+                >
+                  <Plus size={16} />
+                  Lisa foto
+                </button>
+
+                {canModify && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(vehicle)}
+                      className="inline-flex min-w-[105px] flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-200 2xl:flex-none"
+                    >
+                      <Pencil size={16} />
+                      Muuda
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onDelete(vehicle)}
+                      className="inline-flex min-w-[105px] flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-100 2xl:flex-none"
+                    >
+                      <Trash2 size={16} />
+                      Kustuta
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -296,10 +307,21 @@ function MyVehiclesPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [isEditLoading, setIsEditLoading] = useState(false);
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(
     null
   );
+  const [isCreateVehicleOpen, setIsCreateVehicleOpen] = useState(false);
+  const [vehicleToEdit, setVehicleToEdit] = useState<DashboardVehicle | null>(
+    null
+  );
+  const [isUpdateVehicleOpen, setIsUpdateVehicleOpen] = useState(false);
+
+  const [vehicleToDelete, setVehicleToDelete] =
+    useState<DashboardVehicle | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const limit = 10;
 
@@ -391,10 +413,20 @@ function MyVehiclesPage() {
         getCities(),
       ]);
 
-      setCategories(filtersData.vehicleFilters.categories);
-      setCounties(filtersData.vehicleFilters.counties);
-      setCities(filtersData.vehicleFilters.cities);
+      const vehicleCategories = filtersData.vehicleFilters.categories;
+      const vehicleCounties = filtersData.vehicleFilters.counties;
+      const vehicleCities = filtersData.vehicleFilters.cities;
+
+      setCategories(vehicleCategories);
+      setCounties(vehicleCounties);
+      setCities(vehicleCities);
       setFormCities(citiesData);
+
+      setAvailableCategories(vehicleCategories);
+      setAvailableCounties(vehicleCounties);
+      setAvailableCities(vehicleCities);
+      setAvailableStatuses(statusOrder);
+      setAvailableConditions(conditionOrder);
     } catch (error) {
       console.error(error);
 
@@ -409,6 +441,7 @@ function MyVehiclesPage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedRegNumber(filters.regNumber);
+      setPage(1);
     }, FILTER_DEBOUNCE_MS);
 
     return () => {
@@ -530,12 +563,6 @@ function MyVehiclesPage() {
 
     if (categories.length > 0 || counties.length > 0 || cities.length > 0) {
       loadAvailableFilterOptions();
-    } else {
-      setAvailableCategories([]);
-      setAvailableCounties([]);
-      setAvailableCities([]);
-      setAvailableStatuses([]);
-      setAvailableConditions([]);
     }
 
     return () => {
@@ -543,20 +570,18 @@ function MyVehiclesPage() {
     };
   }, [appliedFilters, categories, counties, cities]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [appliedFilters]);
-
   function updateFilter<K extends keyof MyVehicleFilterState>(
     key: K,
     value: MyVehicleFilterState[K]
   ) {
-    setPage(1);
-
     setFilters((current) => ({
       ...current,
       [key]: value,
     }));
+
+    if (key !== "regNumber") {
+      setPage(1);
+    }
   }
 
   function handleResetFilters() {
@@ -566,28 +591,130 @@ function MyVehiclesPage() {
     setPage(1);
   }
 
-  function handleCreateVehiclePlaceholder() {
-    showToast({
-      variant: "info",
-      title: "Lisamine tuleb hiljem",
-      message: "Sõiduki lisamise vorm lisatakse järgmises etapis.",
-    });
+  function handleOpenCreateVehicleModal() {
+    setIsCreateVehicleOpen(true);
   }
 
-  function handleEditVehiclePlaceholder(vehicle: DashboardVehicle) {
-    showToast({
-      variant: "info",
-      title: "Muutmine tuleb hiljem",
-      message: `Sõiduki ${vehicle.reg_number} muutmise vorm lisatakse järgmises etapis.`,
-    });
+  function handleVehicleCreated() {
+    setIsCreateVehicleOpen(false);
+    setSelectedVehicleId(null);
+    loadStats();
+    loadReferenceData();
+
+    if (page === 1) {
+      loadVehicles();
+    } else {
+      setPage(1);
+    }
   }
 
-  function handleDeleteVehiclePlaceholder(vehicle: DashboardVehicle) {
-    showToast({
-      variant: "info",
-      title: "Kustutamine tuleb hiljem",
-      message: `Sõiduki ${vehicle.reg_number} kustutamise kinnitus lisatakse järgmises etapis.`,
-    });
+  async function handleOpenUpdateVehicleModal(vehicle: DashboardVehicle) {
+    if (vehicle.status === "Kinnitatud") {
+      showToast({
+        variant: "error",
+        title: "Muutmine pole lubatud",
+        message: "Kinnitatud sõidukit ei saa muuta.",
+      });
+
+      return;
+    }
+
+    try {
+      setIsEditLoading(true);
+
+      const detailedVehicle = await getMyVehicleById(vehicle.vehicle_id);
+
+      setVehicleToEdit(detailedVehicle);
+      setIsUpdateVehicleOpen(true);
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Sõiduki laadimine ebaõnnestus",
+        message: "Sõiduki muutmise vormi jaoks ei õnnestunud andmeid laadida.",
+      });
+    } finally {
+      setIsEditLoading(false);
+    }
+  }
+
+  function handleCloseUpdateVehicleModal() {
+    setIsUpdateVehicleOpen(false);
+    setVehicleToEdit(null);
+  }
+
+  function handleVehicleUpdated() {
+    setIsUpdateVehicleOpen(false);
+    setVehicleToEdit(null);
+    loadVehicles();
+    loadStats();
+    loadReferenceData();
+  }
+
+  function handleOpenDeleteVehicleModal(vehicle: DashboardVehicle) {
+    if (vehicle.status === "Kinnitatud") {
+      showToast({
+        variant: "error",
+        title: "Kustutamine pole lubatud",
+        message: "Kinnitatud sõidukit ei saa kustutada.",
+      });
+
+      return;
+    }
+
+    setVehicleToDelete(vehicle);
+    setIsDeleteModalOpen(true);
+  }
+
+  function handleCloseDeleteVehicleModal() {
+    if (isDeleting) {
+      return;
+    }
+
+    setIsDeleteModalOpen(false);
+    setVehicleToDelete(null);
+  }
+
+  async function handleConfirmDeleteVehicle() {
+    if (!vehicleToDelete) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+
+      await deleteMyVehicle(vehicleToDelete.vehicle_id);
+
+      showToast({
+        variant: "success",
+        title: "Sõiduk kustutatud",
+        message: `Sõiduk ${vehicleToDelete.reg_number} ja seotud fotod kustutati.`,
+      });
+
+      setSelectedVehicleId(null);
+      setIsDeleteModalOpen(false);
+      setVehicleToDelete(null);
+
+      loadStats();
+      loadReferenceData();
+
+      if (vehicles.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        loadVehicles();
+      }
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Kustutamine ebaõnnestus",
+        message: "Sõidukit ei õnnestunud kustutada.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function handlePageChange(nextPage: number) {
@@ -609,7 +736,7 @@ function MyVehiclesPage() {
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={handleCreateVehiclePlaceholder}
+          onClick={handleOpenCreateVehicleModal}
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-700"
         >
           <Plus size={18} />
@@ -728,8 +855,8 @@ function MyVehiclesPage() {
               vehicle={vehicle}
               index={index}
               onAddPhoto={setSelectedVehicleId}
-              onEdit={handleEditVehiclePlaceholder}
-              onDelete={handleDeleteVehiclePlaceholder}
+              onEdit={handleOpenUpdateVehicleModal}
+              onDelete={handleOpenDeleteVehicleModal}
             />
           ))
         ) : (
@@ -741,7 +868,22 @@ function MyVehiclesPage() {
             <p className="mt-2 text-sm text-slate-500">
               Muuda filtreid või lisa esimene sõiduk.
             </p>
+
+            <button
+              type="button"
+              onClick={handleOpenCreateVehicleModal}
+              className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+            >
+              <Plus size={18} />
+              Lisa sõiduk
+            </button>
           </div>
+        )}
+
+        {isEditLoading && (
+          <p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
+            Laadin muutmise vormi...
+          </p>
         )}
 
         {totalPages > 1 && (
@@ -771,6 +913,19 @@ function MyVehiclesPage() {
         )}
       </section>
 
+      <CreateVehicleModal
+        isOpen={isCreateVehicleOpen}
+        onClose={() => setIsCreateVehicleOpen(false)}
+        onSuccess={handleVehicleCreated}
+      />
+
+      <UpdateVehicleModal
+        isOpen={isUpdateVehicleOpen}
+        vehicle={vehicleToEdit}
+        onClose={handleCloseUpdateVehicleModal}
+        onSuccess={handleVehicleUpdated}
+      />
+
       {selectedVehicle && (
         <AddPhotoModal
           isOpen={Boolean(selectedVehicle)}
@@ -785,6 +940,20 @@ function MyVehiclesPage() {
           }}
         />
       )}
+
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Kustuta sõiduk"
+        message={
+          vehicleToDelete
+            ? `Kas oled kindel, et soovid kustutada sõiduki ${vehicleToDelete.reg_number}? Koos sõidukiga kustutatakse ka kõik selle sõidukiga seotud fotod.`
+            : "Kas oled kindel, et soovid selle sõiduki kustutada?"
+        }
+        confirmLabel="Kustuta sõiduk"
+        isLoading={isDeleting}
+        onClose={handleCloseDeleteVehicleModal}
+        onConfirm={handleConfirmDeleteVehicle}
+      />
     </div>
   );
 }

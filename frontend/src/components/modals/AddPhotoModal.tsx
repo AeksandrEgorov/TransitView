@@ -1,13 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
 import Modal from "../ui/Modal";
 import RequiredLabel from "../ui/RequiredLabel";
 import NativeDateInput from "../ui/NativeDateInput";
 import { createPhoto, uploadPhotoFile } from "../../config/photoApi";
+import { getCounties } from "../../config/referenceApi";
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
-import type { CityItem } from "../../types/reference";
+import type { CityItem, CountyItem } from "../../types/reference";
 import { getTodayIsoDate } from "../../utils/date";
 
 interface Props {
@@ -47,16 +48,69 @@ function AddPhotoModal({
   const today = getTodayIsoDate();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   const [cityId, setCityId] = useState("");
+  const [useNewCity, setUseNewCity] = useState(false);
+  const [newCityName, setNewCityName] = useState("");
+  const [newCityCountyId, setNewCityCountyId] = useState("");
+
   const [place, setPlace] = useState("");
   const [takenAt, setTakenAt] = useState(getTodayIsoDate());
+
+  const [counties, setCounties] = useState<CountyItem[]>([]);
+  const [isCountiesLoading, setIsCountiesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isPlaceRequired = cityId === "";
+  const cityCounties = useMemo(() => {
+    const map = new Map<number, CountyItem>();
+
+    cities.forEach((city) => {
+      map.set(city.county.county_id, city.county);
+    });
+
+    return Array.from(map.values()).sort((firstCounty, secondCounty) =>
+      firstCounty.name.localeCompare(secondCounty.name, "et")
+    );
+  }, [cities]);
+
+  const availableCounties = counties.length > 0 ? counties : cityCounties;
+
+  const isPlaceRequired = !useNewCity && cityId === "";
+
+  useEffect(() => {
+    async function loadCounties() {
+      try {
+        setIsCountiesLoading(true);
+
+        const data = await getCounties();
+        setCounties(data);
+      } catch (error) {
+        console.error(error);
+
+        showToast({
+          variant: "error",
+          title: "Maakondade laadimine ebaõnnestus",
+          message:
+            "Uue linna lisamise jaoks ei õnnestunud maakondi laadida.",
+        });
+      } finally {
+        setIsCountiesLoading(false);
+      }
+    }
+
+    if (isOpen) {
+      loadCounties();
+    }
+  }, [isOpen, showToast]);
 
   function resetForm() {
     setSelectedFile(null);
+
     setCityId("");
+    setUseNewCity(false);
+    setNewCityName("");
+    setNewCityCountyId("");
+
     setPlace("");
     setTakenAt(getTodayIsoDate());
 
@@ -98,6 +152,17 @@ function AddPhotoModal({
     setSelectedFile(file);
   }
 
+  function handleUseNewCityChange(value: boolean) {
+    setUseNewCity(value);
+
+    if (value) {
+      setCityId("");
+    } else {
+      setNewCityName("");
+      setNewCityCountyId("");
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -131,6 +196,28 @@ function AddPhotoModal({
       return;
     }
 
+    if (useNewCity) {
+      if (!newCityName.trim()) {
+        showToast({
+          variant: "error",
+          title: "Linna nimi puudub",
+          message: "Uue linna lisamiseks sisesta linna nimi.",
+        });
+
+        return;
+      }
+
+      if (!newCityCountyId) {
+        showToast({
+          variant: "error",
+          title: "Maakond puudub",
+          message: "Uue linna lisamiseks vali maakond.",
+        });
+
+        return;
+      }
+    }
+
     if (isPlaceRequired && !place.trim()) {
       showToast({
         variant: "error",
@@ -151,6 +238,16 @@ function AddPhotoModal({
       return;
     }
 
+    if (takenAt > today) {
+      showToast({
+        variant: "error",
+        title: "Vale kuupäev",
+        message: "Pildistamise kuupäev ei saa olla tulevikus.",
+      });
+
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -158,8 +255,17 @@ function AddPhotoModal({
 
       await createPhoto({
         vehicle_id: vehicleId,
-        ...(cityId ? { city_id: Number(cityId) } : {}),
-        place: place.trim(),
+        ...(useNewCity
+          ? {
+              new_city: {
+                name: newCityName.trim(),
+                county_id: Number(newCityCountyId),
+              },
+            }
+          : cityId
+            ? { city_id: Number(cityId) }
+            : {}),
+        ...(place.trim() ? { place: place.trim() } : {}),
         taken_at: new Date(`${takenAt}T00:00:00.000Z`).toISOString(),
         file_path: uploaded.file_path,
         cloudinary_public_id: uploaded.public_id,
@@ -168,7 +274,9 @@ function AddPhotoModal({
       showToast({
         variant: "success",
         title: "Foto lisatud",
-        message: "Foto saadeti modereerimisele.",
+        message: useNewCity
+          ? "Foto ja uus linn saadeti modereerimisele."
+          : "Foto saadeti modereerimisele.",
       });
 
       resetForm();
@@ -235,26 +343,97 @@ function AddPhotoModal({
           )}
         </div>
 
-        <div>
-          <RequiredLabel>Linn</RequiredLabel>
+        <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <RequiredLabel required={useNewCity ? false : undefined}>
+                Linn
+              </RequiredLabel>
 
-          <select
-            value={cityId}
-            onChange={(event) => setCityId(event.target.value)}
-            className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-          >
-            <option value="">Linn puudub / väljaspool linna</option>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Vali olemasolev linn või lisa uus linn modereerimiseks.
+              </p>
+            </div>
 
-            {cities.map((city) => (
-              <option key={city.city_id} value={city.city_id}>
-                {city.name}, {city.county.name}
-              </option>
-            ))}
-          </select>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100">
+              <input
+                type="checkbox"
+                checked={useNewCity}
+                onChange={(event) =>
+                  handleUseNewCityChange(event.target.checked)
+                }
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Lisa uus linn
+            </label>
+          </div>
 
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            Kui linn puudub, siis on koha täitmine kohustuslik.
-          </p>
+          {!useNewCity ? (
+            <div className="mt-4">
+              <select
+                value={cityId}
+                onChange={(event) => setCityId(event.target.value)}
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              >
+                <option value="">Linn puudub / väljaspool linna</option>
+
+                {cities.map((city) => (
+                  <option key={city.city_id} value={city.city_id}>
+                    {city.name}, {city.county.name}
+                  </option>
+                ))}
+              </select>
+
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Kui linn puudub, siis on koha täitmine kohustuslik.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <RequiredLabel required>Uue linna nimi</RequiredLabel>
+
+                <input
+                  type="text"
+                  value={newCityName}
+                  onChange={(event) => setNewCityName(event.target.value)}
+                  placeholder="Näiteks Narva-Jõesuu"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  required={useNewCity}
+                />
+              </div>
+
+              <div>
+                <RequiredLabel required>Maakond</RequiredLabel>
+
+                <select
+                  value={newCityCountyId}
+                  onChange={(event) =>
+                    setNewCityCountyId(event.target.value)
+                  }
+                  disabled={isCountiesLoading}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-60 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  required={useNewCity}
+                >
+                  <option value="">
+                    {isCountiesLoading ? "Laadin..." : "Vali maakond"}
+                  </option>
+
+                  {availableCounties.map((county) => (
+                    <option key={county.county_id} value={county.county_id}>
+                      {county.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="sm:col-span-2 text-xs leading-5 text-slate-500">
+                Uus linn lisatakse esmalt staatusega{" "}
+                <span className="font-semibold text-slate-700">Ootel</span>.
+                Moderaator kinnitab selle koos fotoga.
+              </p>
+            </div>
+          )}
         </div>
 
         <div>
@@ -275,7 +454,8 @@ function AddPhotoModal({
             </p>
           ) : (
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Kui linn on valitud, võib koha väli jääda tühjaks.
+              Kui linn on valitud või lisad uue linna, võib koha väli jääda
+              tühjaks.
             </p>
           )}
         </div>
@@ -291,7 +471,8 @@ function AddPhotoModal({
           />
 
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            Vaikimisi kasutatakse tänast kuupäeva.
+            Vaikimisi kasutatakse tänast kuupäeva. Tuleviku kuupäeva ei saa
+            valida.
           </p>
         </div>
 

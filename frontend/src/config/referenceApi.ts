@@ -3,7 +3,10 @@ import api from "./axios";
 import type {
   CategoryItem,
   CityItem,
+  CompanyBranchItem,
+  CompanyItem,
   CountyItem,
+  ModelItem,
   MyFiltersResponse,
   PublicFiltersResponse,
 } from "../types/reference";
@@ -31,6 +34,30 @@ export async function getCounties(): Promise<CountyItem[]> {
 export async function getCities(countyId?: number): Promise<CityItem[]> {
   const response = await api.get("/reference/cities", {
     params: countyId ? { countyId } : undefined,
+  });
+
+  return response.data;
+}
+
+export async function getModels(categoryId?: number): Promise<ModelItem[]> {
+  const response = await api.get("/reference/models", {
+    params: categoryId ? { categoryId } : undefined,
+  });
+
+  return response.data;
+}
+
+export async function getCompanies(): Promise<CompanyItem[]> {
+  const response = await api.get("/reference/companies");
+  return response.data;
+}
+
+export async function getCompanyBranches(params?: {
+  companyId?: number;
+  cityId?: number;
+}): Promise<CompanyBranchItem[]> {
+  const response = await api.get("/reference/company-branches", {
+    params,
   });
 
   return response.data;

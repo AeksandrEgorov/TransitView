@@ -15,6 +15,7 @@ import MyVehiclesPage from "../pages/dashboard/MyVehiclesPage";
 import MyVehicleDetailPage from "../pages/dashboard/MyVehicleDetailPage";
 import MyPhotosPage from "../pages/dashboard/MyPhotosPage";
 import ManageVehiclesPage from "../pages/dashboard/manage/ManageVehiclesPage";
+import ManageVehicleDetailPage from "../pages/dashboard/manage/ManageVehicleDetailPage";
 import ManagePhotosPage from "../pages/dashboard/manage/ManagePhotosPage";
 import ManageUsersPage from "../pages/dashboard/manage/ManageUsersPage";
 
@@ -45,6 +46,7 @@ function AppRoutes() {
             }
           >
             <Route path="manage/vehicles" element={<ManageVehiclesPage />} />
+            <Route path="manage/vehicles/:vehicleId" element={<ManageVehicleDetailPage />} />
             <Route path="manage/photos" element={<ManagePhotosPage />} />
           </Route>
 

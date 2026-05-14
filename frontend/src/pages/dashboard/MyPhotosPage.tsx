@@ -20,9 +20,11 @@ import MyPhotosFilters, {
   type MyPhotoFilterState,
 } from "../../components/dashboard/MyPhotosFilters";
 import PhotoPreviewModal from "../../components/modals/PhotoPreviewModal";
+import UpdatePhotoModal from "../../components/modals/UpdatePhotoModal";
+import DeleteConfirmModal from "../../components/modals/DeleteConfirmModal";
 
-import { getMyPhotos } from "../../config/dashboardApi";
-import { getMyFilters } from "../../config/referenceApi";
+import { deleteMyPhoto, getMyPhotos } from "../../config/dashboardApi";
+import { getCities, getMyFilters } from "../../config/referenceApi";
 import { getMyStats } from "../../config/statsApi";
 
 import { useToast } from "../../hooks/useToast";
@@ -181,8 +183,8 @@ function MyPhotoCard({
         </button>
 
         <div className="p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
+          <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <h3 className="text-2xl font-extrabold text-slate-950">
                   {photo.vehicle.reg_number}
@@ -208,30 +210,32 @@ function MyPhotoCard({
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onPreview(photo)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700"
-              >
-                <ImageIcon size={16} />
-                Vaata fotot
-              </button>
+            <div className="flex w-full flex-col gap-3 2xl:w-auto 2xl:min-w-[360px]">
+              <div className="flex flex-wrap gap-2 2xl:justify-end">
+                <button
+                  type="button"
+                  onClick={() => onPreview(photo)}
+                  className="inline-flex min-w-[125px] flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 2xl:flex-none"
+                >
+                  <ImageIcon size={16} />
+                  Vaata fotot
+                </button>
 
-              <Link
-                to={`/dashboard/vehicles/${photo.vehicle_id}`}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                <Eye size={16} />
-                Vaata sõidukit
-              </Link>
+                <Link
+                  to={`/dashboard/vehicles/${photo.vehicle_id}`}
+                  className="inline-flex min-w-[135px] flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 2xl:flex-none"
+                >
+                  <Eye size={16} />
+                  Vaata sõidukit
+                </Link>
+              </div>
 
               {canModify && (
-                <>
+                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3 2xl:justify-end">
                   <button
                     type="button"
                     onClick={() => onEdit(photo)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
+                    className="inline-flex min-w-[105px] flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-200 2xl:flex-none"
                   >
                     <Pencil size={16} />
                     Muuda
@@ -240,12 +244,12 @@ function MyPhotoCard({
                   <button
                     type="button"
                     onClick={() => onDelete(photo)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
+                    className="inline-flex min-w-[105px] flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-100 2xl:flex-none"
                   >
                     <Trash2 size={16} />
                     Kustuta
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -270,9 +274,19 @@ function MyPhotosPage() {
     null
   );
 
+  const [photoToEdit, setPhotoToEdit] = useState<DashboardPhoto | null>(null);
+  const [isUpdatePhotoOpen, setIsUpdatePhotoOpen] = useState(false);
+
+  const [photoToDelete, setPhotoToDelete] = useState<DashboardPhoto | null>(
+    null
+  );
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [counties, setCounties] = useState<CountyItem[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
+  const [formCities, setFormCities] = useState<CityItem[]>([]);
 
   const [availableCategories, setAvailableCategories] = useState<
     CategoryItem[]
@@ -394,11 +408,15 @@ function MyPhotosPage() {
 
   async function loadReferenceData() {
     try {
-      const data = await getMyFilters();
+      const [filtersData, citiesData] = await Promise.all([
+        getMyFilters(),
+        getCities(),
+      ]);
 
-      setCategories(data.photoFilters.categories);
-      setCounties(data.photoFilters.counties);
-      setCities(data.photoFilters.cities);
+      setCategories(filtersData.photoFilters.categories);
+      setCounties(filtersData.photoFilters.counties);
+      setCities(filtersData.photoFilters.cities);
+      setFormCities(citiesData);
     } catch (error) {
       console.error(error);
 
@@ -571,20 +589,101 @@ function MyPhotosPage() {
     setPage(1);
   }
 
-  function handleEditPhotoPlaceholder(photo: DashboardPhoto) {
-    showToast({
-      variant: "info",
-      title: "Muutmine tuleb hiljem",
-      message: `Foto #${photo.photo_id} muutmise vorm lisatakse järgmises etapis.`,
-    });
+  function handleOpenUpdatePhotoModal(photo: DashboardPhoto) {
+    if (photo.status === "Kinnitatud") {
+      showToast({
+        variant: "error",
+        title: "Muutmine pole lubatud",
+        message: "Kinnitatud fotot ei saa muuta.",
+      });
+
+      return;
+    }
+
+    setPhotoToEdit(photo);
+    setIsUpdatePhotoOpen(true);
   }
 
-  function handleDeletePhotoPlaceholder(photo: DashboardPhoto) {
-    showToast({
-      variant: "info",
-      title: "Kustutamine tuleb hiljem",
-      message: `Foto #${photo.photo_id} kustutamise kinnitus lisatakse järgmises etapis.`,
-    });
+  function handleCloseUpdatePhotoModal() {
+    setIsUpdatePhotoOpen(false);
+    setPhotoToEdit(null);
+  }
+
+  function handlePhotoUpdated() {
+    setIsUpdatePhotoOpen(false);
+    setPhotoToEdit(null);
+    setSelectedPhoto(null);
+    loadPhotos();
+    loadStats();
+    loadReferenceData();
+  }
+
+  function handleOpenDeletePhotoModal(photo: DashboardPhoto) {
+    if (photo.status === "Kinnitatud") {
+      showToast({
+        variant: "error",
+        title: "Kustutamine pole lubatud",
+        message: "Kinnitatud fotot ei saa kustutada.",
+      });
+
+      return;
+    }
+
+    setPhotoToDelete(photo);
+    setIsDeleteModalOpen(true);
+  }
+
+  function handleCloseDeletePhotoModal() {
+    if (isDeleting) {
+      return;
+    }
+
+    setIsDeleteModalOpen(false);
+    setPhotoToDelete(null);
+  }
+
+  async function handleConfirmDeletePhoto() {
+    if (!photoToDelete) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+
+      await deleteMyPhoto(photoToDelete.photo_id);
+
+      showToast({
+        variant: "success",
+        title: "Foto kustutatud",
+        message: `Foto #${photoToDelete.photo_id} eemaldati edukalt.`,
+      });
+
+      if (selectedPhoto?.photo_id === photoToDelete.photo_id) {
+        setSelectedPhoto(null);
+      }
+
+      setIsDeleteModalOpen(false);
+      setPhotoToDelete(null);
+
+      loadStats();
+      loadReferenceData();
+
+      if (photos.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        loadPhotos();
+      }
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Kustutamine ebaõnnestus",
+        message: "Fotot ei õnnestunud kustutada.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function handlePageChange(nextPage: number) {
@@ -753,8 +852,8 @@ function MyPhotosPage() {
               photo={photo}
               index={index}
               onPreview={setSelectedPhoto}
-              onEdit={handleEditPhotoPlaceholder}
-              onDelete={handleDeletePhotoPlaceholder}
+              onEdit={handleOpenUpdatePhotoModal}
+              onDelete={handleOpenDeletePhotoModal}
             />
           ))
         ) : (
@@ -810,6 +909,28 @@ function MyPhotosPage() {
             ? `/dashboard/vehicles/${selectedPhoto.vehicle_id}`
             : undefined
         }
+      />
+
+      <UpdatePhotoModal
+        isOpen={isUpdatePhotoOpen}
+        photo={photoToEdit}
+        cities={formCities}
+        onClose={handleCloseUpdatePhotoModal}
+        onSuccess={handlePhotoUpdated}
+      />
+
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Kustuta foto"
+        message={
+          photoToDelete
+            ? `Kas oled kindel, et soovid kustutada foto #${photoToDelete.photo_id}?`
+            : "Kas oled kindel, et soovid selle foto kustutada?"
+        }
+        confirmLabel="Kustuta foto"
+        isLoading={isDeleting}
+        onClose={handleCloseDeletePhotoModal}
+        onConfirm={handleConfirmDeletePhoto}
       />
     </div>
   );

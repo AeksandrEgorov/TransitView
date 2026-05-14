@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   CalendarDays,
   Camera,
+  CheckCircle2,
+  Clock3,
   Images,
   MapPin,
   Pencil,
@@ -11,33 +13,48 @@ import {
   ShieldCheck,
   Trash2,
   User,
+  XCircle,
 } from "lucide-react";
 
-import DashboardPageHeader from "../../components/dashboard/DashboardPageHeader";
-import ReviewStatusBadge from "../../components/dashboard/ReviewStatusBadge";
-import AddPhotoModal from "../../components/modals/AddPhotoModal";
-import UpdateVehicleModal from "../../components/modals/UpdateVehicleModal";
-import UpdatePhotoModal from "../../components/modals/UpdatePhotoModal";
-import PhotoPreviewModal from "../../components/modals/PhotoPreviewModal";
-import DeleteConfirmModal from "../../components/modals/DeleteConfirmModal";
+import DashboardPageHeader from "../../../components/dashboard/DashboardPageHeader";
+import ReviewStatusBadge from "../../../components/dashboard/ReviewStatusBadge";
+import AddPhotoModal from "../../../components/modals/AddPhotoModal";
+import UpdateVehicleModal from "../../../components/modals/UpdateVehicleModal";
+import UpdatePhotoModal from "../../../components/modals/UpdatePhotoModal";
+import PhotoPreviewModal from "../../../components/modals/PhotoPreviewModal";
+import DeleteConfirmModal from "../../../components/modals/DeleteConfirmModal";
+import ApproveConfirmModal from "../../../components/modals/ApproveConfirmModal";
+import RejectReasonModal from "../../../components/modals/RejectReasonModal";
+import PendingConfirmModal from "../../../components/modals/PendingConfirmModal";
 
 import {
-  deleteMyPhoto,
-  deleteMyVehicle,
-  getMyVehicleById,
-} from "../../config/dashboardApi";
-import { getCities } from "../../config/referenceApi";
+  approveManagePhoto,
+  approveManageVehicle,
+  deleteManagePhoto,
+  deleteManageVehicle,
+  getManageVehicleById,
+  pendingManagePhoto,
+  pendingManageVehicle,
+  rejectManagePhoto,
+  rejectManageVehicle,
+  updateManagePhoto,
+  updateManageVehicle,
+  type ManageVehicle,
+} from "../../../config/manageApi";
+import { getCities } from "../../../config/referenceApi";
 
-import { useToast } from "../../hooks/useToast";
-import { getCloudinaryImageUrl } from "../../utils/cloudinary";
-import { formatVehicleCondition } from "../../utils/formatters";
+import { useToast } from "../../../hooks/useToast";
+import { getCloudinaryImageUrl } from "../../../utils/cloudinary";
+import { formatVehicleCondition } from "../../../utils/formatters";
 
-import type { CityItem } from "../../types/reference";
+import type { CityItem } from "../../../types/reference";
 import type {
   DashboardVehicle,
   DashboardVehiclePhoto,
-} from "../../types/dashboard";
-import type { VehicleCondition } from "../../types/vehicle";
+} from "../../../types/dashboard";
+import type { VehicleCondition } from "../../../types/vehicle";
+
+type ManageVehiclePhoto = NonNullable<ManageVehicle["photos"]>[number];
 
 function formatDate(dateString?: string | null) {
   if (!dateString) {
@@ -47,7 +64,7 @@ function formatDate(dateString?: string | null) {
   return new Date(dateString).toLocaleDateString("et-EE");
 }
 
-function getPhotoLocation(photo?: DashboardVehiclePhoto | null) {
+function getPhotoLocation(photo?: ManageVehiclePhoto | null) {
   if (!photo?.city) {
     return "Asukoht teadmata";
   }
@@ -55,7 +72,7 @@ function getPhotoLocation(photo?: DashboardVehiclePhoto | null) {
   return `${photo.city.name}, ${photo.city.county.name}`;
 }
 
-function getPhotoDate(photo?: DashboardVehiclePhoto | null) {
+function getPhotoDate(photo?: ManageVehiclePhoto | null) {
   if (!photo?.taken_at) {
     return "Kuupäev teadmata";
   }
@@ -103,6 +120,19 @@ function getConditionTextClass(condition: VehicleCondition) {
   return "text-slate-700";
 }
 
+function getPhotosCount(vehicle: ManageVehicle, photosLength: number) {
+  const extendedVehicle = vehicle as ManageVehicle & {
+    photos_count?: number;
+    total_photos_count?: number;
+  };
+
+  return (
+    extendedVehicle.photos_count ??
+    extendedVehicle.total_photos_count ??
+    photosLength
+  );
+}
+
 function getUserLabel(
   user?: {
     username?: string | null;
@@ -115,10 +145,8 @@ function getUserLabel(
   }
 
   const username = user.username || "Nimetu kasutaja";
-  const email = user.email ? ` · ${user.email}` : "";
-  const role = user.role ? ` · ${user.role}` : "";
 
-  return `${username}${email}${role}`;
+  return `${username}`;
 }
 
 function InfoCard({
@@ -169,14 +197,25 @@ function VehiclePhotoCard({
   onPreview,
   onEdit,
   onDelete,
+  onApprove,
+  onReject,
+  onPending,
 }: {
-  photo: DashboardVehiclePhoto;
+  photo: ManageVehiclePhoto;
   isFirstPhoto: boolean;
-  onPreview: (photo: DashboardVehiclePhoto) => void;
-  onEdit: (photo: DashboardVehiclePhoto) => void;
-  onDelete: (photo: DashboardVehiclePhoto) => void;
+  onPreview: (photo: ManageVehiclePhoto) => void;
+  onEdit: (photo: ManageVehiclePhoto) => void;
+  onDelete: (photo: ManageVehiclePhoto) => void;
+  onApprove: (photo: ManageVehiclePhoto) => void;
+  onReject: (photo: ManageVehiclePhoto) => void;
+  onPending: (photo: ManageVehiclePhoto) => void;
 }) {
   const canModify = photo.status !== "Kinnitatud";
+  const canApprove = photo.status !== "Kinnitatud";
+  const canPending =
+    photo.status === "Kinnitatud" || photo.status === "Tagasi_lukatud";
+  const canReject = photo.status !== "Tagasi_lukatud";
+  const hasManageActions = canModify || canApprove || canPending || canReject;
 
   const photoUrl = photo.file_path
     ? getCloudinaryImageUrl(
@@ -257,25 +296,62 @@ function VehiclePhotoCard({
               Vaata fotot
             </button>
 
-            {canModify && (
+            {hasManageActions && (
               <>
-                <button
-                  type="button"
-                  onClick={() => onEdit(photo)}
-                  className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 sm:flex-none"
-                >
-                  <Pencil size={16} />
-                  Muuda
-                </button>
+                {canModify && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(photo)}
+                      className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 sm:flex-none"
+                    >
+                      <Pencil size={16} />
+                      Muuda
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => onDelete(photo)}
-                  className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-100 sm:flex-none"
-                >
-                  <Trash2 size={16} />
-                  Kustuta
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(photo)}
+                      className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-100 sm:flex-none"
+                    >
+                      <Trash2 size={16} />
+                      Kustuta
+                    </button>
+                  </>
+                )}
+
+                {canApprove && (
+                  <button
+                    type="button"
+                    onClick={() => onApprove(photo)}
+                    className="inline-flex min-w-[110px] flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 sm:flex-none"
+                  >
+                    <CheckCircle2 size={16} />
+                    Kinnita
+                  </button>
+                )}
+
+                {canPending && (
+                  <button
+                    type="button"
+                    onClick={() => onPending(photo)}
+                    className="inline-flex min-w-[125px] flex-1 items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 sm:flex-none"
+                  >
+                    <Clock3 size={16} />
+                    Pane ootele
+                  </button>
+                )}
+
+                {canReject && (
+                  <button
+                    type="button"
+                    onClick={() => onReject(photo)}
+                    className="inline-flex min-w-[140px] flex-1 items-center justify-center gap-2 rounded-2xl bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700 transition hover:bg-orange-100 sm:flex-none"
+                  >
+                    <XCircle size={16} />
+                    Lükka tagasi
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -285,21 +361,20 @@ function VehiclePhotoCard({
   );
 }
 
-function MyVehicleDetailPage() {
+function ManageVehicleDetailPage() {
   const { vehicleId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [vehicle, setVehicle] = useState<DashboardVehicle | null>(null);
-  const [vehiclePhotos, setVehiclePhotos] = useState<DashboardVehiclePhoto[]>(
-    []
-  );
+  const [vehicle, setVehicle] = useState<ManageVehicle | null>(null);
+  const [vehiclePhotos, setVehiclePhotos] = useState<ManageVehiclePhoto[]>([]);
   const [cities, setCities] = useState<CityItem[]>([]);
 
-  const [selectedPhoto, setSelectedPhoto] =
-    useState<DashboardVehiclePhoto | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<ManageVehiclePhoto | null>(
+    null
+  );
   const [photoToUpdate, setPhotoToUpdate] =
-    useState<DashboardVehiclePhoto | null>(null);
+    useState<ManageVehiclePhoto | null>(null);
 
   const [isVehicleLoading, setIsVehicleLoading] = useState(true);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
@@ -309,9 +384,35 @@ function MyVehicleDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [photoToDelete, setPhotoToDelete] =
-    useState<DashboardVehiclePhoto | null>(null);
+    useState<ManageVehiclePhoto | null>(null);
   const [isPhotoDeleteModalOpen, setIsPhotoDeleteModalOpen] = useState(false);
   const [isPhotoDeleting, setIsPhotoDeleting] = useState(false);
+
+  const [vehicleToApprove, setVehicleToApprove] =
+    useState<ManageVehicle | null>(null);
+  const [isApprovingVehicle, setIsApprovingVehicle] = useState(false);
+
+  const [vehicleToReject, setVehicleToReject] =
+    useState<ManageVehicle | null>(null);
+  const [vehicleRejectComment, setVehicleRejectComment] = useState("");
+  const [isRejectingVehicle, setIsRejectingVehicle] = useState(false);
+
+  const [vehicleToPending, setVehicleToPending] =
+    useState<ManageVehicle | null>(null);
+  const [isPendingVehicle, setIsPendingVehicle] = useState(false);
+
+  const [photoToApprove, setPhotoToApprove] =
+    useState<ManageVehiclePhoto | null>(null);
+  const [isApprovingPhoto, setIsApprovingPhoto] = useState(false);
+
+  const [photoToReject, setPhotoToReject] =
+    useState<ManageVehiclePhoto | null>(null);
+  const [photoRejectComment, setPhotoRejectComment] = useState("");
+  const [isRejectingPhoto, setIsRejectingPhoto] = useState(false);
+
+  const [photoToPending, setPhotoToPending] =
+    useState<ManageVehiclePhoto | null>(null);
+  const [isPendingPhoto, setIsPendingPhoto] = useState(false);
 
   const photosRef = useRef<HTMLDivElement | null>(null);
   const numericVehicleId = Number(vehicleId);
@@ -324,24 +425,25 @@ function MyVehicleDetailPage() {
 
   const loadVehicle = useCallback(async () => {
     if (Number.isNaN(numericVehicleId)) {
-      navigate("/dashboard/vehicles");
+      navigate("/dashboard/manage/vehicles");
       return;
     }
 
     try {
       setIsVehicleLoading(true);
 
-      const data = await getMyVehicleById(numericVehicleId);
+      const data = await getManageVehicleById(numericVehicleId);
+      const nextPhotos = data.photos ?? [];
 
       setVehicle(data);
-      setVehiclePhotos(data.photos ?? []);
+      setVehiclePhotos(nextPhotos);
 
       setSelectedPhoto((currentPhoto) => {
         if (!currentPhoto) {
           return null;
         }
 
-        const stillExists = data.photos.find(
+        const stillExists = nextPhotos.find(
           (photo) => photo.photo_id === currentPhoto.photo_id
         );
 
@@ -353,7 +455,7 @@ function MyVehicleDetailPage() {
           return null;
         }
 
-        const stillExists = data.photos.find(
+        const stillExists = nextPhotos.find(
           (photo) => photo.photo_id === currentPhoto.photo_id
         );
 
@@ -368,7 +470,7 @@ function MyVehicleDetailPage() {
         message: "Sõiduki detailvaadet ei õnnestunud laadida.",
       });
 
-      navigate("/dashboard/vehicles");
+      navigate("/dashboard/manage/vehicles");
     } finally {
       setIsVehicleLoading(false);
     }
@@ -484,7 +586,7 @@ function MyVehicleDetailPage() {
     loadVehicle();
   }
 
-  function handleOpenUpdatePhotoModal(photo: DashboardVehiclePhoto) {
+  function handleOpenUpdatePhotoModal(photo: ManageVehiclePhoto) {
     if (photo.status === "Kinnitatud") {
       showToast({
         variant: "error",
@@ -541,7 +643,7 @@ function MyVehicleDetailPage() {
     try {
       setIsDeleting(true);
 
-      await deleteMyVehicle(vehicle.vehicle_id);
+      await deleteManageVehicle(vehicle.vehicle_id);
 
       showToast({
         variant: "success",
@@ -549,7 +651,7 @@ function MyVehicleDetailPage() {
         message: `Sõiduk ${vehicle.reg_number} ja seotud fotod kustutati.`,
       });
 
-      navigate("/dashboard/vehicles");
+      navigate("/dashboard/manage/vehicles");
     } catch (error) {
       console.error(error);
 
@@ -563,7 +665,7 @@ function MyVehicleDetailPage() {
     }
   }
 
-  function handleOpenDeletePhotoModal(photo: DashboardVehiclePhoto) {
+  function handleOpenDeletePhotoModal(photo: ManageVehiclePhoto) {
     if (photo.status === "Kinnitatud") {
       showToast({
         variant: "error",
@@ -595,7 +697,7 @@ function MyVehicleDetailPage() {
     try {
       setIsPhotoDeleting(true);
 
-      await deleteMyPhoto(photoToDelete.photo_id);
+      await deleteManagePhoto(photoToDelete.photo_id);
 
       showToast({
         variant: "success",
@@ -628,6 +730,286 @@ function MyVehicleDetailPage() {
     }
   }
 
+  function handleOpenApproveVehicleModal() {
+    if (!vehicle) {
+      return;
+    }
+
+    setVehicleToApprove(vehicle);
+  }
+
+  function handleCloseApproveVehicleModal() {
+    if (isApprovingVehicle) {
+      return;
+    }
+
+    setVehicleToApprove(null);
+  }
+
+  async function handleConfirmApproveVehicle() {
+    if (!vehicleToApprove) {
+      return;
+    }
+
+    try {
+      setIsApprovingVehicle(true);
+
+      await approveManageVehicle(vehicleToApprove.vehicle_id);
+
+      showToast({
+        variant: "success",
+        title: "Sõiduk kinnitatud",
+        message: `Sõiduk ${vehicleToApprove.reg_number} kinnitati.`,
+      });
+
+      setVehicleToApprove(null);
+      loadVehicle();
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Kinnitamine ebaõnnestus",
+        message: "Sõidukit ei õnnestunud kinnitada.",
+      });
+    } finally {
+      setIsApprovingVehicle(false);
+    }
+  }
+
+  function handleOpenRejectVehicleModal() {
+    if (!vehicle) {
+      return;
+    }
+
+    setVehicleRejectComment("");
+    setVehicleToReject(vehicle);
+  }
+
+  function handleCloseRejectVehicleModal() {
+    if (isRejectingVehicle) {
+      return;
+    }
+
+    setVehicleToReject(null);
+    setVehicleRejectComment("");
+  }
+
+  async function handleConfirmRejectVehicle() {
+    if (!vehicleToReject || !vehicleRejectComment.trim()) {
+      return;
+    }
+
+    try {
+      setIsRejectingVehicle(true);
+
+      await rejectManageVehicle(vehicleToReject.vehicle_id, {
+        review_comment: vehicleRejectComment.trim(),
+      });
+
+      showToast({
+        variant: "success",
+        title: "Sõiduk tagasi lükatud",
+        message: `Sõiduk ${vehicleToReject.reg_number} lükati tagasi.`,
+      });
+
+      setVehicleToReject(null);
+      setVehicleRejectComment("");
+      loadVehicle();
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Tagasilükkamine ebaõnnestus",
+        message: "Sõidukit ei õnnestunud tagasi lükata.",
+      });
+    } finally {
+      setIsRejectingVehicle(false);
+    }
+  }
+
+  function handleOpenPendingVehicleModal() {
+    if (!vehicle) {
+      return;
+    }
+
+    setVehicleToPending(vehicle);
+  }
+
+  function handleClosePendingVehicleModal() {
+    if (isPendingVehicle) {
+      return;
+    }
+
+    setVehicleToPending(null);
+  }
+
+  async function handleConfirmPendingVehicle() {
+    if (!vehicleToPending) {
+      return;
+    }
+
+    try {
+      setIsPendingVehicle(true);
+
+      await pendingManageVehicle(vehicleToPending.vehicle_id);
+
+      showToast({
+        variant: "success",
+        title: "Sõiduk pandi ootele",
+        message: `Sõiduk ${vehicleToPending.reg_number} pandi tagasi ootele.`,
+      });
+
+      setVehicleToPending(null);
+      loadVehicle();
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Staatuse muutmine ebaõnnestus",
+        message: "Sõidukit ei õnnestunud tagasi ootele panna.",
+      });
+    } finally {
+      setIsPendingVehicle(false);
+    }
+  }
+
+  function handleOpenApprovePhotoModal(photo: ManageVehiclePhoto) {
+    setPhotoToApprove(photo);
+  }
+
+  function handleCloseApprovePhotoModal() {
+    if (isApprovingPhoto) {
+      return;
+    }
+
+    setPhotoToApprove(null);
+  }
+
+  async function handleConfirmApprovePhoto() {
+    if (!photoToApprove) {
+      return;
+    }
+
+    try {
+      setIsApprovingPhoto(true);
+
+      await approveManagePhoto(photoToApprove.photo_id);
+
+      showToast({
+        variant: "success",
+        title: "Foto kinnitatud",
+        message: `Foto #${photoToApprove.photo_id} kinnitati.`,
+      });
+
+      setPhotoToApprove(null);
+      loadVehicle();
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Kinnitamine ebaõnnestus",
+        message: "Fotot ei õnnestunud kinnitada.",
+      });
+    } finally {
+      setIsApprovingPhoto(false);
+    }
+  }
+
+  function handleOpenRejectPhotoModal(photo: ManageVehiclePhoto) {
+    setPhotoRejectComment("");
+    setPhotoToReject(photo);
+  }
+
+  function handleCloseRejectPhotoModal() {
+    if (isRejectingPhoto) {
+      return;
+    }
+
+    setPhotoToReject(null);
+    setPhotoRejectComment("");
+  }
+
+  async function handleConfirmRejectPhoto() {
+    if (!photoToReject || !photoRejectComment.trim()) {
+      return;
+    }
+
+    try {
+      setIsRejectingPhoto(true);
+
+      await rejectManagePhoto(photoToReject.photo_id, {
+        review_comment: photoRejectComment.trim(),
+      });
+
+      showToast({
+        variant: "success",
+        title: "Foto tagasi lükatud",
+        message: `Foto #${photoToReject.photo_id} lükati tagasi.`,
+      });
+
+      setPhotoToReject(null);
+      setPhotoRejectComment("");
+      loadVehicle();
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Tagasilükkamine ebaõnnestus",
+        message: "Fotot ei õnnestunud tagasi lükata.",
+      });
+    } finally {
+      setIsRejectingPhoto(false);
+    }
+  }
+
+  function handleOpenPendingPhotoModal(photo: ManageVehiclePhoto) {
+    setPhotoToPending(photo);
+  }
+
+  function handleClosePendingPhotoModal() {
+    if (isPendingPhoto) {
+      return;
+    }
+
+    setPhotoToPending(null);
+  }
+
+  async function handleConfirmPendingPhoto() {
+    if (!photoToPending) {
+      return;
+    }
+
+    try {
+      setIsPendingPhoto(true);
+
+      await pendingManagePhoto(photoToPending.photo_id);
+
+      showToast({
+        variant: "success",
+        title: "Foto pandi ootele",
+        message: `Foto #${photoToPending.photo_id} pandi tagasi ootele.`,
+      });
+
+      setPhotoToPending(null);
+      loadVehicle();
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        variant: "error",
+        title: "Staatuse muutmine ebaõnnestus",
+        message: "Fotot ei õnnestunud tagasi ootele panna.",
+      });
+    } finally {
+      setIsPendingPhoto(false);
+    }
+  }
+
   if (isVehicleLoading) {
     return (
       <div className="space-y-8">
@@ -647,6 +1029,10 @@ function MyVehicleDetailPage() {
 
   const canModify = vehicle.status !== "Kinnitatud";
   const canOpenPublicView = vehicle.status === "Kinnitatud";
+  const canApproveVehicle = vehicle.status !== "Kinnitatud";
+  const canPendingVehicle =
+    vehicle.status === "Kinnitatud" || vehicle.status === "Tagasi_lukatud";
+  const canRejectVehicle = vehicle.status !== "Tagasi_lukatud";
   const canAddPhoto = true;
 
   const branchLocation = vehicle.branch?.city
@@ -655,7 +1041,7 @@ function MyVehicleDetailPage() {
 
   const companyName = vehicle.branch?.company?.name ?? "Ettevõte puudub";
   const branchName = vehicle.branch?.branch_name ?? "Filiaal puudub";
-  const photosCount = vehicle.photos_count ?? vehiclePhotos.length;
+  const photosCount = getPhotosCount(vehicle, vehiclePhotos.length);
 
   return (
     <div className="space-y-8">
@@ -668,19 +1054,19 @@ function MyVehicleDetailPage() {
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Link
-            to="/dashboard/vehicles"
+            to="/dashboard/manage/vehicles"
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >
             <ArrowLeft size={18} />
-            Tagasi minu sõidukite juurde
+            Tagasi sõidukite haldusesse
           </Link>
 
           <Link
-            to="/dashboard/photos"
+            to="/dashboard/manage/photos"
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >
             <Images size={18} />
-            Tagasi minu fotode juurde
+            Tagasi fotode haldusesse
           </Link>
         </div>
 
@@ -726,6 +1112,39 @@ function MyVehicleDetailPage() {
                 Kustuta
               </button>
             </>
+          )}
+
+          {canApproveVehicle && (
+            <button
+              type="button"
+              onClick={handleOpenApproveVehicleModal}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              <CheckCircle2 size={18} />
+              Kinnita
+            </button>
+          )}
+
+          {canPendingVehicle && (
+            <button
+              type="button"
+              onClick={handleOpenPendingVehicleModal}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+            >
+              <Clock3 size={18} />
+              Pane ootele
+            </button>
+          )}
+
+          {canRejectVehicle && (
+            <button
+              type="button"
+              onClick={handleOpenRejectVehicleModal}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+            >
+              <XCircle size={18} />
+              Lükka tagasi
+            </button>
           )}
         </div>
       </div>
@@ -846,7 +1265,25 @@ function MyVehicleDetailPage() {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-slate-800">
-                      {vehicle.creator.username}
+                      {getUserLabel(vehicle.creator)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {vehicle.reviewer && (
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200 sm:col-span-2">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-0.5 text-blue-600" size={18} />
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Modereeris
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
+                      {getUserLabel(vehicle.reviewer)}
                     </p>
                   </div>
                 </div>
@@ -875,7 +1312,7 @@ function MyVehicleDetailPage() {
             </h2>
 
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Siin kuvatakse kõik selle sõidukiga seotud sinu nähtavad fotod.
+              Siin kuvatakse kõik selle sõidukiga seotud fotod.
             </p>
           </div>
 
@@ -906,6 +1343,9 @@ function MyVehicleDetailPage() {
                   onPreview={setSelectedPhoto}
                   onEdit={handleOpenUpdatePhotoModal}
                   onDelete={handleOpenDeletePhotoModal}
+                  onApprove={handleOpenApprovePhotoModal}
+                  onReject={handleOpenRejectPhotoModal}
+                  onPending={handleOpenPendingPhotoModal}
                 />
               </div>
             ))}
@@ -937,29 +1377,48 @@ function MyVehicleDetailPage() {
 
       <UpdateVehicleModal
         isOpen={isUpdateVehicleOpen}
-        vehicle={vehicle}
+        vehicle={vehicle as unknown as DashboardVehicle}
         onClose={handleCloseUpdateVehicleModal}
         onSuccess={handleVehicleUpdated}
+        onUpdateVehicle={(vehicleId, data) =>
+          updateManageVehicle(
+            vehicleId,
+            data as Parameters<typeof updateManageVehicle>[1]
+          )
+        }
+        onUpdateFirstPhoto={(photoId, data) =>
+          updateManagePhoto(
+            photoId,
+            data as Parameters<typeof updateManagePhoto>[1]
+          )
+        }
       />
 
       <UpdatePhotoModal
         isOpen={Boolean(photoToUpdate)}
-        photo={photoToUpdate}
+        photo={photoToUpdate as unknown as DashboardVehiclePhoto | null}
         cities={cities}
         onClose={handleCloseUpdatePhotoModal}
         onSuccess={handlePhotoUpdated}
+        onUpdatePhoto={(photoId, data) =>
+          updateManagePhoto(
+            photoId,
+            data as Parameters<typeof updateManagePhoto>[1]
+          )
+        }
       />
 
       <PhotoPreviewModal
         isOpen={!!selectedPhoto}
-        photo={selectedPhoto}
-        vehicle={vehicle}
-        photos={previewPhotos}
+        photo={selectedPhoto as unknown as DashboardVehiclePhoto | null}
+        vehicle={vehicle as unknown as DashboardVehicle}
+        photos={previewPhotos as unknown as DashboardVehiclePhoto[]}
         currentIndex={selectedPhotoIndex >= 0 ? selectedPhotoIndex : 0}
         onClose={() => setSelectedPhoto(null)}
         onPrevious={handlePreviousPhoto}
         onNext={handleNextPhoto}
         showVehicleLink={canOpenPublicView}
+        vehicleLink={`/vehicles/${vehicle.vehicle_id}`}
       />
 
       <DeleteConfirmModal
@@ -985,8 +1444,96 @@ function MyVehicleDetailPage() {
         onClose={handleCloseDeletePhotoModal}
         onConfirm={handleConfirmDeletePhoto}
       />
+
+      <ApproveConfirmModal
+        isOpen={Boolean(vehicleToApprove)}
+        title="Kinnita sõiduk"
+        message={
+          vehicleToApprove
+            ? `Kas oled kindel, et soovid kinnitada sõiduki ${vehicleToApprove.reg_number}? Pärast kinnitamist kuvatakse see avalikus vaates.`
+            : "Kas oled kindel, et soovid selle sõiduki kinnitada?"
+        }
+        confirmLabel="Kinnita sõiduk"
+        isLoading={isApprovingVehicle}
+        onClose={handleCloseApproveVehicleModal}
+        onConfirm={handleConfirmApproveVehicle}
+      />
+
+      <PendingConfirmModal
+        isOpen={Boolean(vehicleToPending)}
+        title="Pane sõiduk ootele"
+        message={
+          vehicleToPending
+            ? `Kas oled kindel, et soovid sõiduki ${vehicleToPending.reg_number} tagasi ootele panna?`
+            : "Kas oled kindel, et soovid selle sõiduki tagasi ootele panna?"
+        }
+        confirmLabel="Pane ootele"
+        isLoading={isPendingVehicle}
+        onClose={handleClosePendingVehicleModal}
+        onConfirm={handleConfirmPendingVehicle}
+      />
+
+      <RejectReasonModal
+        isOpen={Boolean(vehicleToReject)}
+        title="Lükka sõiduk tagasi"
+        message={
+          vehicleToReject
+            ? `Sõiduk ${vehicleToReject.reg_number} lükatakse tagasi. Lisa kasutajale põhjus.`
+            : "Lisa põhjus, miks sõiduk tagasi lükatakse."
+        }
+        comment={vehicleRejectComment}
+        confirmLabel="Lükka sõiduk tagasi"
+        isLoading={isRejectingVehicle}
+        onCommentChange={setVehicleRejectComment}
+        onClose={handleCloseRejectVehicleModal}
+        onConfirm={handleConfirmRejectVehicle}
+      />
+
+      <ApproveConfirmModal
+        isOpen={Boolean(photoToApprove)}
+        title="Kinnita foto"
+        message={
+          photoToApprove
+            ? `Kas oled kindel, et soovid kinnitada foto #${photoToApprove.photo_id}? Pärast kinnitamist saab see avalikus vaates nähtavaks.`
+            : "Kas oled kindel, et soovid selle foto kinnitada?"
+        }
+        confirmLabel="Kinnita foto"
+        isLoading={isApprovingPhoto}
+        onClose={handleCloseApprovePhotoModal}
+        onConfirm={handleConfirmApprovePhoto}
+      />
+
+      <PendingConfirmModal
+        isOpen={Boolean(photoToPending)}
+        title="Pane foto ootele"
+        message={
+          photoToPending
+            ? `Kas oled kindel, et soovid foto #${photoToPending.photo_id} tagasi ootele panna?`
+            : "Kas oled kindel, et soovid selle foto tagasi ootele panna?"
+        }
+        confirmLabel="Pane ootele"
+        isLoading={isPendingPhoto}
+        onClose={handleClosePendingPhotoModal}
+        onConfirm={handleConfirmPendingPhoto}
+      />
+
+      <RejectReasonModal
+        isOpen={Boolean(photoToReject)}
+        title="Lükka foto tagasi"
+        message={
+          photoToReject
+            ? `Foto #${photoToReject.photo_id} lükatakse tagasi. Lisa kasutajale põhjus.`
+            : "Lisa põhjus, miks foto tagasi lükatakse."
+        }
+        comment={photoRejectComment}
+        confirmLabel="Lükka foto tagasi"
+        isLoading={isRejectingPhoto}
+        onCommentChange={setPhotoRejectComment}
+        onClose={handleCloseRejectPhotoModal}
+        onConfirm={handleConfirmRejectPhoto}
+      />
     </div>
   );
 }
 
-export default MyVehicleDetailPage;
+export default ManageVehicleDetailPage;

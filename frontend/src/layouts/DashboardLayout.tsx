@@ -56,15 +56,16 @@ function DashboardLayout() {
 
   return (
     <>
-      <div className="min-h-screen bg-slate-950 px-3 py-3 sm:px-5 sm:py-5">
-        <div className="mx-auto flex min-h-[calc(100vh-24px)] w-full max-w-[1800px] flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:min-h-[calc(100vh-40px)] lg:flex-row">
-          <aside className="bg-slate-900 px-4 py-4 text-white lg:w-72 lg:px-5 lg:py-6">
+      <div className="min-h-screen bg-slate-100">
+        <div className="flex min-h-screen flex-col lg:flex-row">
+          <aside className="bg-slate-900 px-4 py-4 text-white shadow-[8px_0_30px_rgba(15,23,42,0.18)] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-72 lg:flex-col lg:overflow-y-auto lg:px-5 lg:py-6">
             <div className="flex items-center justify-between gap-3 lg:block">
               <Link to="/" className="inline-flex items-center gap-3">
                 <div>
                   <p className="text-lg font-extrabold text-white">
                     TransitView
                   </p>
+
                   <p className="text-xs font-semibold text-slate-400">
                     Töölaud
                   </p>
@@ -156,7 +157,7 @@ function DashboardLayout() {
               )}
             </nav>
 
-            <div className="mt-6 hidden space-y-3 lg:block">
+            <div className="mt-6 hidden space-y-3 lg:mt-auto lg:block">
               <Link
                 to="/"
                 className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/10 hover:text-white"
