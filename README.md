@@ -1,98 +1,98 @@
 # TransitView
 
-TransitView is a full-stack web application for collecting, browsing, and moderating public transport vehicle data and photos.
+TransitView on täisstack veebirakendus ühistranspordi sõidukite andmete ja fotode kogumiseks, vaatamiseks ning modereerimiseks.
 
-The repository is split into:
+Projekt on jagatud kaheks osaks:
 
-- `backend` - Express, Prisma, PostgreSQL, JWT auth, Cloudinary uploads, Resend contact email.
-- `frontend` - React, Vite, Tailwind CSS, React Router.
+- `backend` - Express, Prisma, PostgreSQL, JWT autentimine, Cloudinary pildilaadimised ja Resend kontaktivormi e-post.
+- `frontend` - React, Vite, Tailwind CSS ja React Router.
 
-## Project Structure
+## Projekti Struktuur
 
 ```text
 TransitView/
 |-- backend/
 |   |-- prisma/
-|   |   |-- data/              # Seed data used by backend/prisma/seed.ts
-|   |   |-- migrations/        # Prisma migration files
-|   |   |-- schema.prisma      # Database schema
-|   |   `-- seed.ts            # Creates demo data and database views
+|   |   |-- data/              # Seed-andmed, mida kasutab backend/prisma/seed.ts
+|   |   |-- migrations/        # Prisma migratsioonid
+|   |   |-- schema.prisma      # Andmebaasi skeem
+|   |   `-- seed.ts            # Loob demoandmed ja andmebaasi vaated
 |   |-- src/
-|   |   |-- app.ts             # Express app entry point
-|   |   |-- config/            # Prisma, Multer, Cloudinary setup
-|   |   |-- controllers/       # HTTP request handlers
-|   |   |-- middleware/        # Auth and role checks
-|   |   |-- routes/            # API route definitions
-|   |   |-- services/          # Database and business logic
-|   |   |-- types/             # Backend TypeScript types
-|   |   |-- utils/             # Shared backend helpers
-|   |   |-- validators/        # Zod request validation
-|   |   `-- generated/         # Generated Prisma client, do not edit manually
+|   |   |-- app.ts             # Expressi rakenduse sisenemispunkt
+|   |   |-- config/            # Prisma, Multer ja Cloudinary seadistus
+|   |   |-- controllers/       # HTTP päringute käsitlejad
+|   |   |-- middleware/        # Autentimise ja rollide kontroll
+|   |   |-- routes/            # API marsruudid
+|   |   |-- services/          # Andmebaasi- ja äriloogika
+|   |   |-- types/             # Backendi TypeScript tüübid
+|   |   |-- utils/             # Backendi ühised abifunktsioonid
+|   |   |-- validators/        # Zod päringuvalidaatorid
+|   |   `-- generated/         # Genereeritud Prisma klient, ära muuda käsitsi
 |   `-- package.json
 |-- frontend/
 |   |-- src/
-|   |   |-- assets/            # Global CSS and static frontend assets
-|   |   |-- components/        # Reusable UI, cards, filters, and modals
-|   |   |-- config/            # Frontend API clients
-|   |   |-- context/           # Auth and toast providers
-|   |   |-- data/              # Static page data
-|   |   |-- hooks/             # Reusable React hooks
-|   |   |-- layouts/           # Public and dashboard layouts
-|   |   |-- pages/             # Route pages
-|   |   |-- routes/            # React Router setup and guards
-|   |   |-- types/             # Frontend TypeScript types
-|   |   `-- utils/             # Shared frontend helpers
+|   |   |-- assets/            # Globaalne CSS ja staatilised failid
+|   |   |-- components/        # Taaskasutatavad UI osad, kaardid, filtrid ja modaalid
+|   |   |-- config/            # Frontendi API kliendid
+|   |   |-- context/           # Authi ja toastide providerid
+|   |   |-- data/              # Staatilised leheandmed
+|   |   |-- hooks/             # Taaskasutatavad React hookid
+|   |   |-- layouts/           # Avalik ja dashboard layout
+|   |   |-- pages/             # Route lehed
+|   |   |-- routes/            # React Router seadistus ja route guardid
+|   |   |-- types/             # Frontendi TypeScript tüübid
+|   |   `-- utils/             # Frontendi ühised abifunktsioonid
+|   |-- vercel.json            # Frontendi Vercel seadistus
 |   `-- package.json
-|-- .env.example.backend       # Backend env template
-|-- .env.example.frontend      # Frontend env template
-|-- vercel.json                # Frontend deployment config
+|-- .env.example.backend       # Backendi env näidis
+|-- .env.example.frontend      # Frontendi env näidis
 `-- README.md
 ```
 
-The main rule of thumb is: `controllers` handle HTTP details, `services` handle database/business logic, and frontend `pages` combine API calls with reusable `components`.
+Üldine reegel on lihtne: `controllers` tegelevad HTTP detailidega, `services` sisaldavad andmebaasi- ja äriloogikat ning frontendi `pages` panevad API päringud kokku taaskasutatavate `components` komponentidega.
 
-## Features
+## Funktsioonid
 
-- Public vehicle and photo browsing with filters and pagination.
-- Authenticated dashboard for personal vehicles and photos.
-- Moderation dashboard for editors and administrators.
-- Vehicle creation with first photo upload.
-- Photo uploads for existing vehicles.
-- Review statuses: `Ootel`, `Kinnitatud`, `Tagasi_lukatud`.
-- Vehicle conditions: `Töökorras`, `Ei_tööta`, `Maha_kantud`, `Müüdud`, `Teadmata`.
-- Cloudinary image storage.
-- Contact form email delivery through Resend.
-- Role-based access control.
+- Avalik sõidukite ja fotode sirvimine filtrite ning lehekülgedega.
+- Sisselogitud kasutaja dashboard oma sõidukite ja fotode haldamiseks.
+- Modereerimise dashboard toimetajatele ja administraatoritele.
+- Sõiduki loomine koos esimese foto üleslaadimisega.
+- Fotode lisamine olemasolevatele sõidukitele.
+- Ülevaatuse staatused: `Ootel`, `Kinnitatud`, `Tagasi_lukatud`.
+- Sõiduki seisundid: `Töökorras`, `Ei_tööta`, `Maha_kantud`, `Müüdud`, `Teadmata`.
+- Piltide hoidmine Cloudinarys.
+- Kontaktivormi e-kirjad Resendi kaudu.
+- Rollipõhine ligipääsukontroll.
 
-## Roles
+## Rollid
 
-- `Kasutaja` - manages their own pending/rejected vehicles and photos.
-- `Andmebaasi_toimetaja` - moderates and manages all content.
-- `Administraator` - manages users and has all editor permissions.
+- `Kasutaja` - haldab enda ootel või tagasi lükatud sõidukeid ja fotosid.
+- `Andmebaasi_toimetaja` - modereerib ja haldab kogu sisu.
+- `Administraator` - haldab kasutajaid ning tal on kõik toimetaja õigused.
 
-Administrator restrictions:
+Administraatori piirangud:
 
-- Admin users cannot create another admin through the normal user creation flow.
-- Admin users cannot be deleted.
-- Users with related vehicles or photos cannot be deleted until their content is removed.
+- Administraatorit ei saa tavapärase kasutaja loomise vormi kaudu luua.
+- Administraatori kasutajat ei saa kustutada.
+- Kui kasutajaga on seotud sõidukeid või fotosid, tuleb need enne kasutaja kustutamist eemaldada.
 
-## Requirements
+## Nõuded
 
 - Node.js
 - npm
 - PostgreSQL
-- Cloudinary account
-- Resend account for contact form email
+- Cloudinary konto
+- Resend konto kontaktivormi e-kirjade jaoks
 
-## Backend Setup
+## Backendi Seadistus
 
-From the `backend` folder:
+Mine `backend` kausta:
 
 ```bash
 npm install
 ```
 
-Create `backend/.env` from `.env.example.backend` and fill in the values:
+Loo fail `backend/.env`, kasutades näidisena `.env.example.backend`, ja täida väärtused:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME?schema=SCHEMA_NAME"
@@ -112,88 +112,88 @@ SEED_EDITOR_PASSWORD="change-this-editor-password"
 SEED_ADMIN_PASSWORD="change-this-admin-password"
 ```
 
-Notes:
+Märkused:
 
-- Do not commit real `.env` files. They are ignored by Git.
-- `CONTACT_TO_EMAIL` can contain multiple recipients separated by commas.
-- `CONTACT_FROM_EMAIL` must be a sender Resend allows. `onboarding@resend.dev` is useful for testing. For production, verify your own domain in Resend and use an address like `TransitView <noreply@yourdomain.ee>`.
-- Seed user passwords are intentionally stored in env variables instead of `backend/prisma/data/users.ts`.
+- Ära commiti päris `.env` faile. Need on Gitist välja jäetud.
+- `CONTACT_TO_EMAIL` võib sisaldada mitut saajat, eralda aadressid komadega.
+- `CONTACT_FROM_EMAIL` peab olema saatja, mida Resend lubab kasutada. Testimiseks sobib `onboarding@resend.dev`. Productionis verifitseeri Resendis oma domeen ja kasuta näiteks `TransitView <noreply@sinudomeen.ee>`.
+- Seed kasutajate paroolid on env muutujates, mitte failis `backend/prisma/data/users.ts`.
 
-Generate Prisma client:
+Genereeri Prisma klient:
 
 ```bash
 npm run prisma:generate
 ```
 
-Run migrations:
+Käivita migratsioonid:
 
 ```bash
 npm run prisma:migrate
 ```
 
-Seed/reset the database:
+Loo või lähtesta andmebaas koos seed-andmetega:
 
 ```bash
 npm run db:setup
 ```
 
-Run backend in development:
+Käivita backend arenduses:
 
 ```bash
 npm run dev
 ```
 
-Build backend:
+Buildi backend:
 
 ```bash
 npm run build
 ```
 
-Start built backend:
+Käivita builditud backend:
 
 ```bash
 npm run start
 ```
 
-Default local API:
+Vaikimisi lokaalne API aadress:
 
 ```text
 http://localhost:5000/api
 ```
 
-## Frontend Setup
+## Frontendi Seadistus
 
-From the `frontend` folder:
+Mine `frontend` kausta:
 
 ```bash
 npm install
 ```
 
-Create `frontend/.env` from `.env.example.frontend`:
+Loo fail `frontend/.env`, kasutades näidisena `.env.example.frontend`:
 
 ```env
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
-Run frontend in development:
+Käivita frontend arenduses:
 
 ```bash
 npm run dev
 ```
 
-Build frontend:
+Buildi frontend:
 
 ```bash
 npm run build
 ```
 
-Lint frontend:
+Kontrolli frontendi lintimist:
 
 ```bash
 npm run lint
 ```
 
-Preview production build:
+Vaata production buildi lokaalselt:
 
 ```bash
 npm run preview
@@ -201,40 +201,53 @@ npm run preview
 
 ## Deployment
 
-### Frontend on Vercel
+Avalikku deploy versiooni saab vaadata siin:
 
-The repo includes root-level `vercel.json` for easier frontend deployment.
+```text
+https://transitview.vercel.app/
+```
 
-It uses:
+Esimene avamine võib võtta umbes minuti, sest backend kasutab tasuta plaani ja võib vahepeal magama minna.
+
+### Frontend Vercelis
+
+Frontendi kaustas on `frontend/vercel.json`, mis teeb Vercelis SPA route'id korda ja suunab otse avatud lehed tagasi `index.html` peale.
+
+Kui Verceli projekti root on `frontend`, kasuta:
+
+- install command: `npm ci`
+- build command: `npm run build`
+- output directory: `dist`
+
+Kui Verceli projekti root on repo juur, kasuta:
 
 - install command: `cd frontend && npm ci`
 - build command: `cd frontend && npm run build`
 - output directory: `frontend/dist`
-- SPA rewrite to `index.html` so direct route refreshes work.
 
-Set this Vercel environment variable:
+Lisa Vercelisse see environment variable:
 
 ```env
 VITE_API_BASE_URL=https://your-backend-url/api
 ```
 
-### Backend Hosting
+### Backendi Majutus
 
-The backend is a long-running Express server and should be deployed to a Node-capable host such as Render, Railway, Fly.io, VPS, or another service that supports PostgreSQL networking and persistent environment variables.
+Backend on pikalt töötav Express server. Seda tasub majutada Node'i toetavas keskkonnas, näiteks Render, Railway, Fly.io, VPS või mõni muu teenus, mis lubab PostgreSQL ühendust ja püsivaid env muutujaid.
 
-Set the same backend env variables listed in the backend setup section.
+Lisa samad backendi env muutujad, mis on kirjas backendi seadistuse osas.
 
-## Contact Form Email
+## Kontaktivormi E-post
 
-The frontend posts contact messages to:
+Frontend saadab kontaktivormi päringud siia:
 
 ```text
 POST /api/contact
 ```
 
-The backend validates the payload with Zod and sends the email through Resend.
+Backend valideerib andmed Zodiga ja saadab kirja Resendi kaudu.
 
-Required backend env variables:
+Vajalikud backendi env muutujad:
 
 ```env
 RESEND_API_KEY=""
@@ -242,17 +255,17 @@ CONTACT_FROM_EMAIL="TransitView <onboarding@resend.dev>"
 CONTACT_TO_EMAIL="youremail@example.com"
 ```
 
-The submitted user email is sent as `reply_to`, so admins can reply directly to the person who submitted the form.
+Kasutaja sisestatud e-post läheb kirja `reply_to` väljale, nii et administraator saab vastata otse vormi saatjale.
 
-## Authentication
+## Autentimine
 
-Login returns a JWT token. Protected requests use:
+Login tagastab JWT tokeni. Kaitstud päringud kasutavad päist:
 
 ```text
 Authorization: Bearer TOKEN
 ```
 
-## Main API Endpoints
+## Peamised API Endpointid
 
 ### Auth
 
@@ -261,7 +274,7 @@ POST /api/auth/login
 GET  /api/auth/me
 ```
 
-### Public Vehicles
+### Avalikud Sõidukid
 
 ```text
 GET    /api/vehicles
@@ -272,9 +285,9 @@ DELETE /api/vehicles/:id
 GET    /api/vehicles/pending
 ```
 
-Vehicle create/update/delete requires auth. Pending vehicles require editor/admin role.
+Sõiduki loomine, muutmine ja kustutamine nõuab sisselogimist. Ootel sõidukite vaade nõuab toimetaja või administraatori rolli.
 
-### Public Photos
+### Avalikud Fotod
 
 ```text
 POST   /api/photos/upload
@@ -287,11 +300,11 @@ DELETE /api/photos/:id
 GET    /api/photos/pending
 ```
 
-Photo create/update/delete requires auth. Pending photos require editor/admin role.
+Foto loomine, muutmine ja kustutamine nõuab sisselogimist. Ootel fotode vaade nõuab toimetaja või administraatori rolli.
 
-### Manage Vehicles
+### Sõidukite Haldus
 
-Editor/admin only:
+Ainult toimetajale ja administraatorile:
 
 ```text
 GET    /api/manage/vehicles
@@ -303,9 +316,9 @@ PATCH  /api/manage/vehicles/:id/reject
 PATCH  /api/manage/vehicles/:id/pending
 ```
 
-### Manage Photos
+### Fotode Haldus
 
-Editor/admin only:
+Ainult toimetajale ja administraatorile:
 
 ```text
 GET    /api/manage/photos
@@ -317,9 +330,9 @@ PATCH  /api/manage/photos/:id/reject
 PATCH  /api/manage/photos/:id/pending
 ```
 
-### Manage Users
+### Kasutajate Haldus
 
-Editor/admin can list and inspect users. Admin-only operations are enforced in routes/controllers where needed.
+Toimetaja ja administraator saavad kasutajaid vaadata. Administraatori-only tegevused on piiratud route'ides ja controllerites.
 
 ```text
 GET    /api/manage/users
@@ -329,7 +342,7 @@ PATCH  /api/manage/users/:id
 DELETE /api/manage/users/:id
 ```
 
-### Reference Data
+### Reference Andmed
 
 ```text
 GET /api/reference/public-filters
@@ -343,9 +356,9 @@ GET /api/reference/companies
 GET /api/reference/company-branches
 ```
 
-`my-filters` requires auth. `manage-filters` requires editor/admin role and includes manage-visible data, including unreviewed/new data.
+`my-filters` nõuab sisselogimist. `manage-filters` nõuab toimetaja või administraatori rolli ning sisaldab haldusele nähtavaid andmeid, ka uusi ja üle vaatamata kirjeid.
 
-### Stats
+### Statistika
 
 ```text
 GET /api/stats/public
@@ -353,25 +366,26 @@ GET /api/stats/my
 GET /api/stats/manage
 ```
 
-`my` requires auth. `manage` requires editor/admin role.
+`my` nõuab sisselogimist. `manage` nõuab toimetaja või administraatori rolli.
 
-### Contact
+### Kontakt
 
 ```text
 POST /api/contact
 ```
 
-Public endpoint for the contact form.
+Avalik endpoint kontaktivormi jaoks.
 
-## Moderation Rules
+## Modereerimise Reeglid
 
-- New vehicles and photos are created with `Ootel` status.
-- Approved items become `Kinnitatud`.
-- Rejected items become `Tagasi_lukatud` and require a review comment.
-- Vehicle approval/rejection also updates related pending references where needed.
-- Manage pages can see all statuses. Public pages only expose approved public data.
+- Uued sõidukid ja fotod luuakse staatusega `Ootel`.
+- Kinnitatud kirjed saavad staatuse `Kinnitatud`.
+- Tagasi lükatud kirjed saavad staatuse `Tagasi_lukatud` ja vajavad kommentaari.
+- Sõiduki kinnitamine või tagasilükkamine uuendab vajadusel seotud ootel reference-andmeid.
+- Kui kinnitatud sõiduk viiakse tagasi `Ootel` staatusesse, viiakse ka ainult selle sõidukiga seotud reference-andmed tagasi `Ootel` staatusesse.
+- Halduse lehed näevad kõiki staatusi. Avalikud lehed näitavad ainult kinnitatud avalikke andmeid.
 
-## Useful Commands
+## Kasulikud Käsud
 
 Backend:
 
@@ -391,9 +405,9 @@ npm run build
 npm run dev
 ```
 
-## Security Notes
+## Turvalisuse Märkused
 
-- Never commit real API keys, JWT secrets, database URLs, or seed passwords.
-- Rotate any API key that was shared outside the local `.env`.
-- Keep `VITE_API_BASE_URL` public-safe because frontend env variables are bundled into client code.
-- Keep Resend, Cloudinary secret keys, JWT secret, and database credentials only in backend env variables.
+- Ära commiti päris API võtmeid, JWT secreteid, andmebaasi URL-e ega seed paroole.
+- Kui mõni API võti on väljaspool kohalikku `.env` faili jagatud, roteeri see.
+- `VITE_API_BASE_URL` peab olema avalikuks kasutuseks sobiv, sest frontendi env muutujad lähevad kliendikoodi sisse.
+- Resendi ja Cloudinary salajased võtmed, JWT secret ja andmebaasi andmed peavad jääma ainult backendi env muutujatesse.
