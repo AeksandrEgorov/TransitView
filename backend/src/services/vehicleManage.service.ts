@@ -8,6 +8,7 @@ import {
   type VehicleCondition,
 } from "../generated/prisma/client.js";
 import { dbView } from "../utils/dbView.js";
+import { resetConfirmedVehicleReferencesToPendingIfUnused } from "./referenceCleanup.service.js";
 
 interface GetManageVehiclesParams {
   page: number;
@@ -722,6 +723,7 @@ export async function pendingManageVehicle(vehicleId: number) {
       data: getPendingReviewData(),
     });
 
+    await resetConfirmedVehicleReferencesToPendingIfUnused(tx, vehicleId);
     await setFirstVehiclePhotoPending(tx, vehicleId);
 
     return true;
