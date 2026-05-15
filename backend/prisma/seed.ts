@@ -247,6 +247,193 @@ async function createReviewTriggers() {
   `);
 }
 
+async function createVehicleProcedures() {
+  await prisma.$executeRawUnsafe(`
+    CREATE OR REPLACE PROCEDURE "${DB_SCHEMA}".sp_add_vehicle(
+      IN p_model_id INTEGER,
+      IN p_branch_id INTEGER,
+      IN p_reg_number VARCHAR(20),
+      IN p_vla_year SMALLINT,
+      IN p_vin_code VARCHAR(30),
+      IN p_chassis VARCHAR(100),
+      IN p_status "${DB_SCHEMA}"."ReviewStatus",
+      IN p_condition "${DB_SCHEMA}"."VehicleCondition",
+      IN p_created_by INTEGER
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      IF p_reg_number IS NULL OR btrim(p_reg_number) = '' THEN
+        RAISE EXCEPTION 'reg_number ei tohi olla tühi';
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1
+        FROM ${table("Models")}
+        WHERE "model_id" = p_model_id
+      ) THEN
+        RAISE EXCEPTION 'Mudelit model_id=% ei eksisteeri', p_model_id;
+      END IF;
+
+      IF p_branch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM ${table("Company_branches")}
+        WHERE "branch_id" = p_branch_id
+      ) THEN
+        RAISE EXCEPTION 'Filiaali branch_id=% ei eksisteeri', p_branch_id;
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1
+        FROM ${table("Users")}
+        WHERE "user_id" = p_created_by
+      ) THEN
+        RAISE EXCEPTION 'Kasutajat created_by=% ei eksisteeri', p_created_by;
+      END IF;
+
+      IF p_vla_year IS NOT NULL
+        AND (p_vla_year < 1900 OR p_vla_year > EXTRACT(YEAR FROM CURRENT_DATE) + 1) THEN
+        RAISE EXCEPTION 'vla_year väärtus % ei ole lubatud', p_vla_year;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM ${table("Vehicles")}
+        WHERE "reg_number" = btrim(p_reg_number)
+      ) THEN
+        RAISE EXCEPTION 'Sõiduk registrinumbriga % on juba olemas', p_reg_number;
+      END IF;
+
+      INSERT INTO ${table("Vehicles")} (
+        "model_id",
+        "branch_id",
+        "reg_number",
+        "vla_year",
+        "vin_code",
+        "chassis",
+        "status",
+        "condition",
+        "created_by"
+      )
+      VALUES (
+        p_model_id,
+        p_branch_id,
+        btrim(p_reg_number),
+        p_vla_year,
+        NULLIF(btrim(p_vin_code), ''),
+        NULLIF(btrim(p_chassis), ''),
+        p_status,
+        p_condition,
+        p_created_by
+      );
+    END;
+    $$;
+
+    CREATE OR REPLACE PROCEDURE "${DB_SCHEMA}".sp_update_vehicle(
+      IN p_vehicle_id INTEGER,
+      IN p_model_id INTEGER,
+      IN p_branch_id INTEGER,
+      IN p_reg_number VARCHAR(20),
+      IN p_vla_year SMALLINT,
+      IN p_vin_code VARCHAR(30),
+      IN p_chassis VARCHAR(100),
+      IN p_status "${DB_SCHEMA}"."ReviewStatus",
+      IN p_condition "${DB_SCHEMA}"."VehicleCondition",
+      IN p_reviewed_by INTEGER
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM ${table("Vehicles")}
+        WHERE "vehicle_id" = p_vehicle_id
+      ) THEN
+        RAISE EXCEPTION 'Sõidukit vehicle_id=% ei leitud', p_vehicle_id;
+      END IF;
+
+      IF p_model_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM ${table("Models")}
+        WHERE "model_id" = p_model_id
+      ) THEN
+        RAISE EXCEPTION 'Mudelit model_id=% ei eksisteeri', p_model_id;
+      END IF;
+
+      IF p_branch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM ${table("Company_branches")}
+        WHERE "branch_id" = p_branch_id
+      ) THEN
+        RAISE EXCEPTION 'Filiaali branch_id=% ei eksisteeri', p_branch_id;
+      END IF;
+
+      IF p_reviewed_by IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM ${table("Users")}
+        WHERE "user_id" = p_reviewed_by
+      ) THEN
+        RAISE EXCEPTION 'Kontrollijat user_id=% ei eksisteeri', p_reviewed_by;
+      END IF;
+
+      IF p_reg_number IS NOT NULL AND btrim(p_reg_number) = '' THEN
+        RAISE EXCEPTION 'reg_number ei tohi olla tühi';
+      END IF;
+
+      IF p_vla_year IS NOT NULL
+        AND (p_vla_year < 1900 OR p_vla_year > EXTRACT(YEAR FROM CURRENT_DATE) + 1) THEN
+        RAISE EXCEPTION 'vla_year väärtus % ei ole lubatud', p_vla_year;
+      END IF;
+
+      IF p_reg_number IS NOT NULL AND EXISTS (
+        SELECT 1
+        FROM ${table("Vehicles")}
+        WHERE "reg_number" = btrim(p_reg_number)
+          AND "vehicle_id" <> p_vehicle_id
+      ) THEN
+        RAISE EXCEPTION 'Teisel sõidukil on juba registrinumber %', p_reg_number;
+      END IF;
+
+      UPDATE ${table("Vehicles")}
+      SET
+        "model_id" = COALESCE(p_model_id, "model_id"),
+        "branch_id" = p_branch_id,
+        "reg_number" = COALESCE(NULLIF(btrim(p_reg_number), ''), "reg_number"),
+        "vla_year" = p_vla_year,
+        "vin_code" = NULLIF(btrim(p_vin_code), ''),
+        "chassis" = NULLIF(btrim(p_chassis), ''),
+        "status" = COALESCE(p_status, "status"),
+        "condition" = COALESCE(p_condition, "condition"),
+        "reviewed_by" = p_reviewed_by,
+        "reviewed_at" = CASE
+          WHEN p_reviewed_by IS NOT NULL THEN CURRENT_TIMESTAMP
+          ELSE "reviewed_at"
+        END
+      WHERE "vehicle_id" = p_vehicle_id;
+    END;
+    $$;
+
+    CREATE OR REPLACE PROCEDURE "${DB_SCHEMA}".sp_delete_vehicle(
+      IN p_vehicle_id INTEGER
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM ${table("Vehicles")}
+        WHERE "vehicle_id" = p_vehicle_id
+      ) THEN
+        RAISE EXCEPTION 'Sõidukit vehicle_id=% ei leitud', p_vehicle_id;
+      END IF;
+
+      DELETE FROM ${table("Vehicles")}
+      WHERE "vehicle_id" = p_vehicle_id;
+    END;
+    $$;
+  `);
+}
+
 async function createViews() {
   await prisma.$executeRawUnsafe(`
     CREATE VIEW ${view("v_public_vehicles")} AS
@@ -1221,6 +1408,10 @@ async function main() {
   console.log("Creating review triggers...");
   await createReviewTriggers();
   console.log("✅ Review triggers created successfully.");
+
+  console.log("Creating vehicle procedures...");
+  await createVehicleProcedures();
+  console.log("✅ Vehicle procedures created successfully.");
 
   const countyMap = await seedCounties();
   console.log(`✅ Counties seeded: ${countyMap.size}`);
