@@ -1,0 +1,17 @@
+export const counties = [
+  { name: "Harjumaa" },
+  { name: "Hiiumaa" },
+  { name: "Ida-Virumaa" },
+  { name: "Jõgevamaa" },
+  { name: "Järvamaa" },
+  { name: "Läänemaa" },
+  { name: "Lääne-Virumaa" },
+  { name: "Põlvamaa" },
+  { name: "Pärnumaa" },
+  { name: "Raplamaa" },
+  { name: "Saaremaa" },
+  { name: "Tartumaa" },
+  { name: "Valgamaa" },
+  { name: "Viljandimaa" },
+  { name: "Võrumaa" },
+];
